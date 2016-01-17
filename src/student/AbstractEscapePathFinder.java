@@ -4,9 +4,14 @@ import java.util.Collection;
 import java.util.Optional;
 
 import game.Node;
-
+/**
+ * Abstract superclass to provide common methods as an alternative to a utility
+ * class.
+ */
 public abstract class AbstractEscapePathFinder implements EscapePathFinder {
 
+	EscapePath escapePath;
+	
 	public AbstractEscapePathFinder() {
 		super();
 	}

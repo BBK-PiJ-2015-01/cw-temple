@@ -21,7 +21,6 @@ public class ShortestEscapePathFinder extends AbstractEscapePathFinder {
 
 	private Node exit;
 
-	private EscapePath escapePath;
 	// Comparator for evaluating explore path sort order
 	private Comparator<SearchNode> searchPathComparator = (sn1, sn2) -> searchPathComparator(sn1, sn2);
 
