@@ -172,7 +172,7 @@ public class Explorer {
 		escapeState = state;
 		
 		// Allow for different plans to be generated
-		EscapePathFinder pathFinder = new SimpleEscapePathFinder();
+		EscapePathFinder pathFinder = new SimpleEscapePathFinder(state);
 
 		EscapePath escapePlan = pathFinder.findEscapePath(state);
 		implementEscapePlan(escapePlan);

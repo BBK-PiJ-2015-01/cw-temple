@@ -24,11 +24,15 @@ public class ShortestEscapePathFinder extends AbstractEscapePathFinder {
 	// Comparator for evaluating explore path sort order
 	private Comparator<SearchNode> searchPathComparator = (sn1, sn2) -> searchPathComparator(sn1, sn2);
 
+	public ShortestEscapePathFinder(EscapeState state) {
+		super(state);
+	}
+
 	@Override
 	public EscapePath findEscapePath(EscapeState state) {
 
 		exit = state.getExit();
-		
+
 		// Start at the current node
 		final List<SearchNode> searchNodes = new LinkedList<>();
 		Node n = state.getCurrentNode();
@@ -70,10 +74,7 @@ public class ShortestEscapePathFinder extends AbstractEscapePathFinder {
 			}
 		}
 		// Get the best PathNode
-		SearchNode nearestPathNode = pathNodes.stream()
-				.filter(f -> f.isOpen())
-				.sorted(searchPathComparator)
-				.findFirst()
+		SearchNode nearestPathNode = pathNodes.stream().filter(f -> f.isOpen()).sorted(searchPathComparator).findFirst()
 				.get();
 		buildEscapePath(nearestPathNode, pathNodes);
 	}
