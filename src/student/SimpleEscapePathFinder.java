@@ -9,24 +9,26 @@ import game.Edge;
 import game.EscapeState;
 import game.Node;
 import student.EscapePath;
+
 /**
  * A simple brute force implementation to use all the alloted time in testing
- * different escape paths. The shortest escape path will be returned as a default
+ * different escape paths. The shortest escape path will be returned as a
+ * default
  */
 public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
-	
+
 	private Node exit;
 	private Node exitCovering;
 	private int exitRow;
 	private int exitCol;
-	
+
 	// Control variables
-	private double avgLength = 10;				// Guestimate of average edge length
-	private long timeout;						// Elapsed time of exit planning
-	
+	private double avgLength = 10; // Guestimate of average edge length
+	private long timeout; // Elapsed time of exit planning
+
 	// Comparator for evaluating exit paths
 	private Comparator<Edge> escapePathComparator = (e1, e2) -> escapePathComparator(e1, e2);
-	
+
 	public SimpleEscapePathFinder(EscapeState state) {
 		super(state);
 	}
@@ -40,11 +42,12 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 		exitCovering = exit.getNeighbours().stream().findFirst().get();
 		exitRow = state.getExit().getTile().getRow();
 		exitCol = state.getExit().getTile().getColumn();
-		
+
 		// Set the shortest escape route as a default
 		escapePath = new ShortestEscapePathFinder(state).findEscapePath(escapeState);
-		
-		// Start at the current node and process  until timeout expires or all options explored
+
+		// Start at the current node and process until timeout expires or all
+		// options explored
 		timeout = System.currentTimeMillis() + this.MAX_TIME_IN_MS;
 		buildEscapePaths(new EscapePath(state.getCurrentNode()));
 		System.out.println(String.format("%d additional paths found", numberOfPathsFound));
@@ -52,7 +55,7 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 	}
 
 	private void buildEscapePaths(EscapePath p) {
-		
+
 		if (System.currentTimeMillis() > timeout) {
 			return;
 		}
@@ -62,23 +65,20 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 		for (Edge e : newExits) {
 
 			Node nextNode = e.getDest();
-			if (isInRange(nextNode, p.getLength()) 
-					&& p.getLength() + e.length <= escapeState.getTimeRemaining()
-					&& !p.getPath().contains(nextNode))
-			{
-				// If the exit is covered then the only node that can be added 
+			if (isInRange(nextNode, p.getLength()) && p.getLength() + e.length <= escapeState.getTimeRemaining()
+					&& !p.getPath().contains(nextNode)) {
+				// If the exit is covered then the only node that can be added
 				// is the exit node as the path cannot cross itself
 				if (p.getPath().contains(exitCovering) && !nextNode.equals(exit)) {
 					continue;
 				}
-				
+
 				EscapePath np = new EscapePath(p);
 				np.addGold(nextNode.getTile().getGold());
 				np.addLength(e.length);
 				np.addNode(nextNode);
 
-				if (exit.equals(nextNode) 
-						&& np.getLength() <= escapeState.getTimeRemaining()) {
+				if (exit.equals(nextNode) && np.getLength() <= escapeState.getTimeRemaining()) {
 					setEscapeRoute(np);
 					continue;
 				} else {
@@ -92,7 +92,7 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 
 		Node o1 = e1.getDest();
 		Node o2 = e1.getDest();
-		
+
 		// Primary comparison is Euclidean distance from exit
 		int rowDist = o1.getTile().getRow() - exit.getTile().getRow();
 		int colDist = o1.getTile().getColumn() - exit.getTile().getColumn();
@@ -102,22 +102,29 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 		rowDist = o2.getTile().getRow() - exit.getTile().getRow();
 		colDist = o2.getTile().getColumn() - exit.getTile().getColumn();
 		Double d2 = Math.sqrt((rowDist * rowDist) + (colDist * colDist));
-		
-		int returnValue = d1.compareTo(d2); 	
+
+		// int returnValue = d1.compareTo(d2);
 		// If nodes are equidistant then apply other criteria
+
+		// if (returnValue == 0) { // Amount of gold
+		// returnValue = Integer.compare(o2.getTile().getGold(),
+		// o1.getTile().getGold());
+		// }
 		
-		if (returnValue == 0) {		// Amount of gold	
-			returnValue = Integer.compare(o2.getTile().getGold(), o1.getTile().getGold());
+		int returnValue = Integer.compare(o2.getTile().getGold(), o1.getTile().getGold());
+		if (returnValue == 0) { // Amount of gold
+			returnValue = d1.compareTo(d2);
 		}
-		if (returnValue == 0) {		// Edge length
+		
+		if (returnValue == 0) { // Edge length
 			returnValue = Integer.compare(e1.length(), e2.length());
-		}		
-		if (returnValue == 0) {		// Finally compare on id to enforce determinism
+		}
+		if (returnValue == 0) { // Finally compare on id to enforce determinism
 			returnValue = Long.compare(o2.getId(), o1.getId());
 		}
 		return returnValue;
 	}
-	
+
 	private boolean isInRange(Node n, int pLength) {
 
 		// Estimate if the node is too far from the exit to possibly reach
@@ -129,6 +136,5 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 		d *= this.avgLength;
 		return d + pLength < escapeState.getTimeRemaining();
 	}
-	
 
 }
