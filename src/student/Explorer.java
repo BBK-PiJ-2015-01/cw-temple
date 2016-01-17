@@ -3,9 +3,7 @@ package student;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 
-import game.Edge;
 import game.EscapeState;
 import game.ExplorationState;
 import game.Node;
@@ -16,6 +14,9 @@ public class Explorer {
 	private List<ExploreNode> explorePath;
 	// Comparator for evaluating explore path sort order
 	private Comparator<ExploreNode> explorePathComparator = (en1, en2) -> explorePathComparator(en1, en2);
+	
+	private EscapeState escapeState;
+	
 
 	/**
 	 * Explore the cavern, trying to find the orb in as few steps as possible.
@@ -161,6 +162,28 @@ public class Explorer {
 	 *            the information available at the current state
 	 */
 	public void escape(EscapeState state) {
-		// TODO: Escape from the cavern before time runs out
+		
+		escapeState = state;
+		EscapePathFinder pathFinder;
+		
+		// Allow for different plans to be generated
+		EscapePath escapePlan = pathFinder.findEscapePath(state);
+		implementEscapePlan(escapePlan);
+	}
+	
+	private void implementEscapePlan(EscapePath escapePlan) {
+
+		escapePlan.getPath().stream().forEach(e -> followPath(e));
+	}
+
+	private void followPath(Node n) {
+
+		// Pick up any gold before moving on
+		if (escapeState.getCurrentNode().getTile().getGold() > 0) {
+			escapeState.pickUpGold();
+		}
+		if (!n.equals(escapeState.getCurrentNode())) {
+			escapeState.moveTo(n);
+		}
 	}
 }
