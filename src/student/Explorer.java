@@ -49,12 +49,13 @@ public class Explorer {
 	public void explore(ExplorationState state) {
 
 		// In the unlikely event of the Orb being in the entrance
-		if (explorationState.getDistanceToTarget() == 0) {
+		if (state.getDistanceToTarget() == 0) {
 			return;
 		}
 		explorationState = state;
 		explorePath = new ArrayList<>();
-
+		ExploreNode exploreNode = new ExploreNode(explorationState.getCurrentLocation(), 0, 0 , explorationState.getDistanceToTarget());
+		explorePath(exploreNode); 
 	}
 
 	private void explorePath(ExploreNode exploreNode) {
@@ -79,7 +80,8 @@ public class Explorer {
 				.forEach(ns -> updateExploreNode(getExploreNodeById(ns.getId()), exploreNode));
 
 		// Add the neighbours to the open list
-		explorationState.getNeighbours().stream().filter(ns -> nodeExists(ns.getId()))
+		explorationState.getNeighbours().stream()
+				.filter(ns -> !nodeExists(ns.getId()))
 				.forEach(ns -> explorePath.add(new ExploreNode(ns.getId(), exploreNode.getId(),
 						exploreNode.getgCost() + 1, ns.getDistanceToTarget())));
 
