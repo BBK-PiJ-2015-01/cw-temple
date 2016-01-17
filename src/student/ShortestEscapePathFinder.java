@@ -17,7 +17,7 @@ import student.EscapePath;
  * route. Whilst not expected to be the best solution it is intended to provide
  * a fall back escape route for other path finders.
  */
-public class ShortestEscapePathFinder implements EscapePathFinder {
+public class ShortestEscapePathFinder extends AbstractEscapePathFinder {
 
 	private Node exit;
 
@@ -105,20 +105,8 @@ public class ShortestEscapePathFinder implements EscapePathFinder {
 		Collections.reverse(escapePath.getPath());
 	}
 
-	Optional<SearchNode> getPathNodeByNode(Node n, Collection<SearchNode> pathNodes) {
-
-		return pathNodes.stream().filter(pn -> n.getId() == pn.getNode().getId()).findFirst();
-	}
-
 	private int searchPathComparator(SearchNode sn1, SearchNode sn2) {
 		// Explore path nodes should be ordered on descending F-cost
 		return Integer.compare(sn1.getFCost(), sn2.getFCost());
-	}
-
-	double euclideanDistance(Node n1, Node n2) {
-
-		int rowDist = n1.getTile().getRow() - n2.getTile().getRow();
-		int colDist = n1.getTile().getColumn() - n2.getTile().getColumn();
-		return Math.sqrt((rowDist * rowDist) + (colDist * colDist));
 	}
 }
