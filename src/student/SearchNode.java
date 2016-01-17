@@ -8,7 +8,7 @@ public class SearchNode {
 	private Node parentNode;
 	private int gCost;
 	private int hCost;
-
+	private boolean isOpen = true;
 	
 	public SearchNode(Node node, Node parentNode, int gCost, int hCost) {
 
@@ -50,4 +50,11 @@ public class SearchNode {
 		this.hCost = hCost;
 	}
 
+	public boolean isOpen() {
+		return isOpen;
+	}
+
+	public void close() {
+		isOpen = false;
+	}	
 }
