@@ -1,6 +1,7 @@
 package student;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -12,7 +13,9 @@ import game.Node;
 public class Explorer {
 
 	private ExplorationState explorationState;
-	private List<SearchNode> explorePath;
+	private List<ExploreNode> explorePath;
+	// Comparator for evaluating explore path sort order
+	private Comparator<ExploreNode> explorePathComparator = (en1, en2) -> explorePathComparator(en1, en2);
 
 	/**
 	 * Explore the cavern, trying to find the orb in as few steps as possible.
@@ -54,10 +57,10 @@ public class Explorer {
 
 	}
 
-	private void searchPath(SearchNode searchNode) {
+	private void explorePath(ExploreNode exploreNode) {
 
 		long currentLocationId = explorationState.getCurrentLocation();
-		long searchNodeId = searchNode.getNode().getId();
+		long searchNodeId = exploreNode.getId();
 
 		if (currentLocationId != searchNodeId) {
 			explorationState.moveTo(searchNodeId);
@@ -68,70 +71,62 @@ public class Explorer {
 			return;
 		}
 
+		exploreNode.close();
+
 		// Update any open nodes if this is a shorter route
-		explorationState.getNeighbours().stream()
-			.filter(ns -> openNodeExists(ns.getId()))
-			.filter(ns -> getSearchNodeById(ns.getId()).getgCost() > searchNode.getgCost() + 1)
-			.forEach(ns -> updateOpenNode(getSearchNodeById(ns.getId()), searchNode));
-		
+		explorationState.getNeighbours().stream().filter(ns -> openNodeExists(ns.getId()))
+				.filter(ns -> getExploreNodeById(ns.getId()).getgCost() > exploreNode.getgCost() + 1)
+				.forEach(ns -> updateExploreNode(getExploreNodeById(ns.getId()), exploreNode));
+
 		// Add the neighbours to the open list
-		explorationState.getNeighbours().stream()
-			.filter(ns -> nodeExists(ns.getId()))
-			.forEach(n -> open.add(new OpenNodeImpl(n.getId(), startNode.getGCost() + 1, n.getDistanceToTarget(),
-						startNode.getId())));
+		explorationState.getNeighbours().stream().filter(ns -> nodeExists(ns.getId()))
+				.forEach(ns -> explorePath.add(new ExploreNode(ns.getId(), exploreNode.getId(),
+						exploreNode.getgCost() + 1, ns.getDistanceToTarget())));
 
-		// At exit node so store as the base escape path
-		if (n == exit) {
-			createExitPathFromPathNodes(pathNodes);
-			return;
+		// TODO: Implement check to see if retracing steps will get us closer
+
+
+		boolean goBack = !explorePath.stream()
+				.filter(en -> en.getParentId() == exploreNode.getId()) 
+				.filter(on -> on.isOpen()).findAny().isPresent();
+		
+		// If nowhere to go then retrace path back to parent..
+		if (goBack) {
+			explorePath(getExploreNodeById(exploreNode.getParentId()));
+		} else {
+			// ...otherwise find the best node to move to
+			explorePath.stream()
+				.filter(en -> en.getParentId() == exploreNode.getId())
+				.filter(en -> en.isOpen())
+				.sorted(explorePathComparator)
+				.forEach(en -> explorePath(en));
 		}
-		// This node is now closed
-		on.close();
-		// Set the neighbours as open nodes, or update them if this is a shorter
-		// path
-		for (Edge e : n.getExits()) {
-
-			Node neighbour = e.getDest();
-			int distToExit = (int) euclideanDistance(neighbour, exit);
-			Optional<PathNode> opt = getPathNodeByNode(neighbour, pathNodes);
-
-			int newGCost = on.getGCost() + e.length();
-			if (!opt.isPresent()) {
-				pathNodes.add(new PathNodeImpl(neighbour, newGCost, distToExit, n));
-			} else {
-				PathNode found = opt.get();
-				if (found.isOpen() && newGCost < found.getGCost()) {
-					found.setParentNode(n);
-					found.setGCost(newGCost);
-				}
-			}
-		}
-		// Get the best PathNode
-		PathNode nearestPathNode = pathNodes.stream().filter(f -> f.isOpen()).sorted().findFirst().get();
-		buildShortestRouteToExit(nearestPathNode, pathNodes);
 	}
 
 	private boolean nodeExists(long id) {
 
-		return explorePath.stream().filter(sn -> sn.getNode().getId() == id ).findAny().isPresent();
+		return explorePath.stream().filter(sn -> sn.getId() == id).findAny().isPresent();
 	}
-	
+
 	private boolean openNodeExists(long id) {
 
-		return explorePath.stream().filter(sn -> sn.getNode().getId() == id && sn.isOpen()).findAny().isPresent();
+		return explorePath.stream().filter(sn -> sn.getId() == id && sn.isOpen()).findAny().isPresent();
 	}
-	
-	private SearchNode getSearchNodeById(long id) {
+
+	private ExploreNode getExploreNodeById(long id) {
 		// Assume that existence has already been proved
-		return explorePath.stream().filter(sn -> sn.getNode().getId() == id).findFirst().get();
+		return explorePath.stream().filter(sn -> sn.getId() == id).findFirst().get();
 	}
 
-
-
-	private void updateOpenNode(SearchNode targetNode, SearchNode parentNode) {
+	private void updateExploreNode(ExploreNode targetNode, ExploreNode parentNode) {
 
 		targetNode.setgCost(parentNode.getgCost() + 1);
-		targetNode.setParentNode(parentNode.getNode());
+		targetNode.setParentId(parentNode.getId());
+	}
+
+	private int explorePathComparator(ExploreNode en1, ExploreNode en2) {
+		// Explore path nodes should be ordered on descending H-cost
+		return Integer.compare(en1.gethCost(), en2.gethCost());
 	}
 
 	/**
