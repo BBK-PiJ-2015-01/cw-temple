@@ -23,7 +23,7 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 	private int exitCol;
 
 	// Control variables
-	private double avgLength = 10; // Guestimate of average edge length
+	private double avgLength = 10; // Guesstimate of average edge length
 	private long timeout; // Elapsed time of exit planning
 
 	// Comparator for evaluating exit paths
@@ -93,7 +93,12 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 		Node o1 = e1.getDest();
 		Node o2 = e1.getDest();
 
-		// Primary comparison is Euclidean distance from exit
+		// Primary comparison is Gold	
+		int returnValue = Integer.compare(o2.getTile().getGold(), o1.getTile().getGold());
+		
+		if (returnValue == 0) { // Edge length
+			returnValue = Integer.compare(e1.length(), e2.length());
+		}
 		int rowDist = o1.getTile().getRow() - exit.getTile().getRow();
 		int colDist = o1.getTile().getColumn() - exit.getTile().getColumn();
 		Double d1 = Math.sqrt((rowDist * rowDist) + (colDist * colDist));
@@ -102,23 +107,11 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 		rowDist = o2.getTile().getRow() - exit.getTile().getRow();
 		colDist = o2.getTile().getColumn() - exit.getTile().getColumn();
 		Double d2 = Math.sqrt((rowDist * rowDist) + (colDist * colDist));
-
-		// int returnValue = d1.compareTo(d2);
-		// If nodes are equidistant then apply other criteria
-
-		// if (returnValue == 0) { // Amount of gold
-		// returnValue = Integer.compare(o2.getTile().getGold(),
-		// o1.getTile().getGold());
-		// }
 		
-		int returnValue = Integer.compare(o2.getTile().getGold(), o1.getTile().getGold());
-		if (returnValue == 0) { // Amount of gold
+		if (returnValue == 0) { // Distance from exit
 			returnValue = d1.compareTo(d2);
 		}
 		
-		if (returnValue == 0) { // Edge length
-			returnValue = Integer.compare(e1.length(), e2.length());
-		}
 		if (returnValue == 0) { // Finally compare on id to enforce determinism
 			returnValue = Long.compare(o2.getId(), o1.getId());
 		}
