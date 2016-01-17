@@ -21,6 +21,10 @@ public abstract class AbstractEscapePathFinder implements EscapePathFinder {
 	 * Maximum time allowed to find a valid path.
 	 */
 	int MAX_TIME_IN_MS = 10000;
+	/**
+	 * The number of escape routes found. Useful for testing
+	 */
+	int numberOfPathsFound;
 	
 	public AbstractEscapePathFinder(EscapeState state) {
 		escapeState = state;
@@ -41,6 +45,7 @@ public abstract class AbstractEscapePathFinder implements EscapePathFinder {
 
 	 void setEscapeRoute(EscapePath p) {
 
+		 numberOfPathsFound++;
 		// Save the path if it is valid and more valuable than the existing one
 		if (p.getGold() > (escapePath == null ? -1 : escapePath.getGold())) {
 			if (p.getLength() <= escapeState.getTimeRemaining()) {

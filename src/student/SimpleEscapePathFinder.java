@@ -16,6 +16,7 @@ import student.EscapePath;
 public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 	
 	private Node exit;
+	private Node exitCovering;
 	private int exitRow;
 	private int exitCol;
 	
@@ -35,6 +36,8 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 
 		escapeState = state;
 		exit = state.getExit();
+		// The exit nodes have only one neighbour
+		exitCovering = exit.getNeighbours().stream().findFirst().get();
 		exitRow = state.getExit().getTile().getRow();
 		exitCol = state.getExit().getTile().getColumn();
 		
@@ -44,6 +47,7 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 		// Start at the current node and process  until timeout expires or all options explored
 		timeout = System.currentTimeMillis() + this.MAX_TIME_IN_MS;
 		buildEscapePaths(new EscapePath(state.getCurrentNode()));
+		System.out.println(String.format("%d additional paths found", numberOfPathsFound));
 		return escapePath;
 	}
 
@@ -60,16 +64,21 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 			Node nextNode = e.getDest();
 			if (isInRange(nextNode, p.getLength()) 
 					&& p.getLength() + e.length <= escapeState.getTimeRemaining()
-					&& !p.getPath().contains(nextNode)
-					) 
+					&& !p.getPath().contains(nextNode))
 			{
-
+				// If the exit is covered then the only node that can be added 
+				// is the exit node as the path cannot cross itself
+				if (p.getPath().contains(exitCovering) && !nextNode.equals(exit)) {
+					continue;
+				}
+				
 				EscapePath np = new EscapePath(p);
 				np.addGold(nextNode.getTile().getGold());
 				np.addLength(e.length);
 				np.addNode(nextNode);
 
-				if (exit.equals(nextNode) && np.getLength() <= escapeState.getTimeRemaining()) {
+				if (exit.equals(nextNode) 
+						&& np.getLength() <= escapeState.getTimeRemaining()) {
 					setEscapeRoute(np);
 					continue;
 				} else {
