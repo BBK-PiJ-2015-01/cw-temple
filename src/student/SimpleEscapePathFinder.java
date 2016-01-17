@@ -19,11 +19,8 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 
 	private Node exit;
 	private Node exitCovering;
-	private int exitRow;
-	private int exitCol;
 
 	// Control variables
-	private double avgLength = 10; // Guesstimate of average edge length
 	private long timeout; // Elapsed time of exit planning
 
 	// Comparator for evaluating exit paths
@@ -40,8 +37,6 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 		exit = state.getExit();
 		// The exit nodes have only one neighbour
 		exitCovering = exit.getNeighbours().stream().findFirst().get();
-		exitRow = state.getExit().getTile().getRow();
-		exitCol = state.getExit().getTile().getColumn();
 
 		// Set the shortest escape route as a default
 		escapePath = new ShortestEscapePathFinder(state).findEscapePath(escapeState);
@@ -93,9 +88,9 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 		Node o1 = e1.getDest();
 		Node o2 = e1.getDest();
 
-		// Primary comparison is Gold	
+		// Primary comparison is Gold
 		int returnValue = Integer.compare(o2.getTile().getGold(), o1.getTile().getGold());
-		
+
 		if (returnValue == 0) { // Edge length
 			returnValue = Integer.compare(e1.length(), e2.length());
 		}
@@ -107,27 +102,14 @@ public class SimpleEscapePathFinder extends AbstractEscapePathFinder {
 		rowDist = o2.getTile().getRow() - exit.getTile().getRow();
 		colDist = o2.getTile().getColumn() - exit.getTile().getColumn();
 		Double d2 = Math.sqrt((rowDist * rowDist) + (colDist * colDist));
-		
+
 		if (returnValue == 0) { // Distance from exit
 			returnValue = d1.compareTo(d2);
 		}
-		
+
 		if (returnValue == 0) { // Finally compare on id to enforce determinism
 			returnValue = Long.compare(o2.getId(), o1.getId());
 		}
 		return returnValue;
 	}
-
-	private boolean isInRange(Node n, int pLength) {
-
-		// Estimate if the node is too far from the exit to possibly reach
-		int nRow = n.getTile().getRow();
-		int nCol = n.getTile().getColumn();
-		int rowDist = nRow - exitRow;
-		int colDist = nCol - exitCol;
-		Double d = Math.sqrt((rowDist * rowDist) + (colDist * colDist));
-		d *= this.avgLength;
-		return d + pLength < escapeState.getTimeRemaining();
-	}
-
 }
