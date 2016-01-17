@@ -9,7 +9,7 @@ public class SearchNode {
 	private int gCost;
 	private int hCost;
 	private boolean isOpen = true;
-	
+
 	public SearchNode(Node node, Node parentNode, int gCost, int hCost) {
 
 		this.node = node;
@@ -34,19 +34,23 @@ public class SearchNode {
 		this.parentNode = parentNode;
 	}
 
-	public int getgCost() {
+	public int getFCost() {
+		return gCost + hCost;
+	}
+
+	public int getGCost() {
 		return gCost;
 	}
 
-	public void setgCost(int gCost) {
+	public void setGCost(int gCost) {
 		this.gCost = gCost;
 	}
 
-	public int gethCost() {
+	public int getHCost() {
 		return hCost;
 	}
 
-	public void sethCost(int hCost) {
+	public void setHCost(int hCost) {
 		this.hCost = hCost;
 	}
 
@@ -56,5 +60,5 @@ public class SearchNode {
 
 	public void close() {
 		isOpen = false;
-	}	
+	}
 }
