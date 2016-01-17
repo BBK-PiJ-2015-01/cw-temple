@@ -10,6 +10,7 @@ import game.Node;
 
 public class Explorer {
 
+	private boolean explorationComplete;
 	private ExplorationState explorationState;
 	private List<ExploreNode> explorePath;
 	// Comparator for evaluating explore path sort order
@@ -61,6 +62,10 @@ public class Explorer {
 
 	private void explorePath(ExploreNode exploreNode) {
 
+		if (explorationComplete) {
+			return;
+		}
+		
 		long currentLocationId = explorationState.getCurrentLocation();
 		long searchNodeId = exploreNode.getId();
 
@@ -70,6 +75,7 @@ public class Explorer {
 
 		// Found it
 		if (explorationState.getDistanceToTarget() == 0) {
+			explorationComplete = true;	// Cancel any further exploration
 			return;
 		}
 

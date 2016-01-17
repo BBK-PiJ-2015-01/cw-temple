@@ -14,8 +14,8 @@ import student.EscapePath;
 
 /**
  * An implementation of the A* algorithm to find the shortest possible escape
- * route. Whilst not expected to be the best solution it allows for all escape
- * problems to be definitively solved.
+ * route. Whilst not expected to be the best solution it is intended to provide
+ * a fall back escape route for other path finders.
  */
 public class ShortestEscapePathFinder implements EscapePathFinder {
 
@@ -30,13 +30,12 @@ public class ShortestEscapePathFinder implements EscapePathFinder {
 
 		exit = state.getExit();
 		
-		// Start by finding the shortest route to the exit
+		// Start at the current node
 		final List<SearchNode> searchNodes = new LinkedList<>();
 		Node n = state.getCurrentNode();
 		SearchNode startNode = new SearchNode(n, null, 0, (int) euclideanDistance(n, exit));
 		searchNodes.add(startNode);
 		buildEscapePath(startNode, searchNodes);
-		// TODO Auto-generated method stub
 		return escapePath;
 	}
 
@@ -44,7 +43,7 @@ public class ShortestEscapePathFinder implements EscapePathFinder {
 
 		Node n = sn.getNode();
 
-		// At exit node so store as the base escape path
+		// At exit node so generate the escape plane from the search path
 		if (n == exit) {
 			createExitPathFromPathNodes(pathNodes);
 			return;
@@ -82,9 +81,8 @@ public class ShortestEscapePathFinder implements EscapePathFinder {
 
 	private void createExitPathFromPathNodes(Collection<SearchNode> pathNodes) {
 
-		// Start at the current node
+		// Start at the exit node and follow the path backwards
 		SearchNode pathNodeExit = getPathNodeByNode(exit, pathNodes).get();
-//		EscapePath shortestEscapePath = new EscapePath(exit);
 		escapePath = new EscapePath(exit);
 
 		Optional<SearchNode> optPathNode = getPathNodeByNode(pathNodeExit.getParentNode(), pathNodes);
@@ -107,7 +105,7 @@ public class ShortestEscapePathFinder implements EscapePathFinder {
 		Collections.reverse(escapePath.getPath());
 	}
 
-	private Optional<SearchNode> getPathNodeByNode(Node n, Collection<SearchNode> pathNodes) {
+	Optional<SearchNode> getPathNodeByNode(Node n, Collection<SearchNode> pathNodes) {
 
 		return pathNodes.stream().filter(pn -> n.getId() == pn.getNode().getId()).findFirst();
 	}
