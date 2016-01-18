@@ -71,10 +71,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 	// Need to generate an EscapePath for each node in the shortest route
 	private void populateStack(Collection<Node> nodes) {
 
-		// System.out.println(String.format("%d paths supplied to stack",
-		// nodes.size()));
 		stack = new ConcurrentLinkedDeque<>();
-		// stack = new LinkedBlockingDeque<>(1000);
 
 		Node parentNode = null;
 		EscapePath p = null;
@@ -104,9 +101,6 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			stack.add(p);
 			parentNode = n;
 		}
-
-		// System.out.println(String.format("%d paths added to stack",
-		// stack.size()));
 	}
 
 	private void buildEscapePaths() {
@@ -215,7 +209,9 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 							if (firstPath == null) {
 								firstPath = np;
 							} else {
-								stack.push(np);
+								if (!stack.contains(np)) {
+									stack.push(np);
+								}
 							}
 						}
 					}
