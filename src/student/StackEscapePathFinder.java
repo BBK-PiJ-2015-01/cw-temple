@@ -78,7 +78,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			if (parentNode == null) { //
 				p = new EscapePath(n);
 				p.addGold(n.getTile().getGold());
-				stack.add(p);
+				stack.push(p);
 				parentNode = n;
 				continue;
 			}
@@ -88,7 +88,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			p = new EscapePath(p);
 			p.addGold(n.getTile().getGold());
 			p.addLength(e.length());
-			stack.add(p);
+			stack.push(p);
 			parentNode = n;
 		}
 
@@ -202,7 +202,6 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 					}
 				}
 				invokeAll(new SearchThread());
-				System.out.println("After invoke all");
 				if (bestPath != null) {
 					processPath(bestPath);
 				}
