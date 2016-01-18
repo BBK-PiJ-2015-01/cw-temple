@@ -49,7 +49,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 		// Set the shortest escape route as a default
 		escapePath = new ShortestEscapePathFinder(state).findEscapePath(escapeState);
-		
+
 		timeout = System.currentTimeMillis() + this.MAX_TIME_IN_MS;
 		populateStack(escapePath.getPath());
 		buildEscapePaths();
@@ -60,7 +60,8 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 	// Need to generate an EscapePath for each node in the shortest route
 	private void populateStack(Collection<Node> nodes) {
 
-//		System.out.println(String.format("%d paths supplied to stack", nodes.size()));
+		// System.out.println(String.format("%d paths supplied to stack",
+		// nodes.size()));
 		stack = new ConcurrentLinkedDeque<>();
 
 		Node parentNode = null;
@@ -91,20 +92,21 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			parentNode = n;
 		}
 
-//		System.out.println(String.format("%d paths added to stack", stack.size()));
+		// System.out.println(String.format("%d paths added to stack",
+		// stack.size()));
 	}
 
 	private void buildEscapePaths() {
 
-//		int maxThreads = Runtime.getRuntime().availableProcessors();
+		// int maxThreads = Runtime.getRuntime().availableProcessors();
 		ForkJoinPool pool = new ForkJoinPool();
-//		ExecutorService pool = Executors.newFixedThreadPool(maxThreads);
+		// ExecutorService pool = Executors.newFixedThreadPool(maxThreads);
 		int submissions = 0;
-		while(System.currentTimeMillis() < timeout) {
-			
+		while (System.currentTimeMillis() < timeout) {
+
 			pool.invoke(new SearchThread());
-			
-//			System.out.println(++submissions + " invokations");
+
+			// System.out.println(++submissions + " invokations");
 		}
 
 	}
@@ -141,29 +143,34 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 	class SearchThread extends RecursiveAction {
 
-		/**
-		 * 
-		 */
 		private static final long serialVersionUID = 8473109576846837452L;
 
 		@Override
 		public void compute() {
-			
+
 			if (System.currentTimeMillis() > timeout) {
 				return;
 			}
-			
-			// Take the top Escape path from the stack
 			EscapePath p = null;
 			try {
 				p = stack.pop();
-			} catch(NoSuchElementException e) {
+			} catch (NoSuchElementException e) {
 				// The stack is empty so quit
+				return;
+			}
+
+			processPath(p);
+		}
+
+		private void processPath(EscapePath p) {
+
+			if (System.currentTimeMillis() > timeout) {
 				return;
 			}
 
 			List<Edge> newExits = new ArrayList<Edge>(p.getNode().getExits());
 			Collections.sort(newExits, escapePathComparator);
+			EscapePath bestPath = null;
 			for (Edge e : newExits) {
 
 				Node nextNode = e.getDest();
@@ -182,14 +189,23 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 					np.addNode(nextNode);
 
 					if (exit.equals(nextNode) && np.getLength() <= escapeState.getTimeRemaining()) {
-//						System.out.println(Thread.currentThread().getName() + ": Solution found");
+						// System.out.println(Thread.currentThread().getName() +
+						// ": Solution found");
 						setEscapeRoute(np);
 						continue;
 					} else {
-						stack.push(np);
+						if (bestPath == null) {
+							bestPath = np;
+						} else {
+							stack.push(np);
+						}
 					}
 				}
 				invokeAll(new SearchThread());
+				System.out.println("After invoke all");
+				if (bestPath != null) {
+					processPath(bestPath);
+				}
 			}
 		}
 	}
