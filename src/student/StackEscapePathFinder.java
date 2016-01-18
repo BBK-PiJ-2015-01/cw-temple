@@ -77,7 +77,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			if (parentNode == null) { //
 				p = new EscapePath(n);
 				p.addGold(n.getTile().getGold());
-				stack.push(p);
+				stack.add(p);
 				parentNode = n;
 				continue;
 			}
@@ -87,7 +87,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			p = new EscapePath(p);
 			p.addGold(n.getTile().getGold());
 			p.addLength(e.length());
-			stack.push(p);
+			stack.add(p);
 			parentNode = n;
 		}
 
