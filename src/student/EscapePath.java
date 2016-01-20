@@ -7,14 +7,15 @@ import game.Node;
 
 public class EscapePath {
 
-	private int length = 0;
-	private int gold = 0;
+	private int length;
+	private int gold;
 	private Node node;
-	List<Node> path;
+	private List<Node> path;
 
 	public EscapePath(Node node) {
 
 		this.node = node;
+
 		path = new LinkedList<>();
 		path.add(node);
 	}
@@ -25,6 +26,7 @@ public class EscapePath {
 		gold = escapePath.gold;
 		node = escapePath.node;
 		path = new LinkedList<>(escapePath.path);
+
 	}
 
 	public void addLength(int length) {
@@ -44,6 +46,7 @@ public class EscapePath {
 	}
 
 	public void addNode(Node node) {
+
 		this.node = node;
 		path.add(node);
 	}

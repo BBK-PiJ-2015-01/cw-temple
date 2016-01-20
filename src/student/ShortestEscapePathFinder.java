@@ -91,6 +91,7 @@ public class ShortestEscapePathFinder extends AbstractEscapePathFinder {
 		while (nextPathNode != null) {
 
 			Node nextNode = nextPathNode.getNode();
+			escapePath.addLength(escapePath.getNode().getEdge(nextNode).length());
 			escapePath.addNode(nextNode);
 			escapePath.addGold(nextNode.getTile().getGold());
 			if (nextPathNode.getParentNode() == null) {

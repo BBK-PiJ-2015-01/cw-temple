@@ -3,9 +3,11 @@ package student;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 import game.EscapeState;
 import game.ExplorationState;
+import game.GameState;
 import game.Node;
 
 public class Explorer {
@@ -15,6 +17,7 @@ public class Explorer {
 	private List<ExploreNode> explorePath;
 	// Comparator for evaluating explore path sort order
 	private Comparator<ExploreNode> explorePathComparator = (en1, en2) -> explorePathComparator(en1, en2);
+
 	
 	private EscapeState escapeState;
 	
@@ -58,6 +61,7 @@ public class Explorer {
 		explorePath = new ArrayList<>();
 		ExploreNode exploreNode = new ExploreNode(explorationState.getCurrentLocation(), 0, 0 , explorationState.getDistanceToTarget());
 		explorePath(exploreNode); 
+		return;
 	}
 
 	private void explorePath(ExploreNode exploreNode) {
@@ -65,25 +69,45 @@ public class Explorer {
 		if (explorationComplete) {
 			return;
 		}
-		
+
 		long currentLocationId = explorationState.getCurrentLocation();
 		long searchNodeId = exploreNode.getId();
-
+		
 		if (currentLocationId != searchNodeId) {
 			explorationState.moveTo(searchNodeId);
 		}
-
+				
 		// Found it
-		if (explorationState.getDistanceToTarget() == 0) {
+		int distanceToTarget = explorationState.getDistanceToTarget();
+		if (distanceToTarget == 0) {
 			explorationComplete = true;	// Cancel any further exploration
 			return;
 		}
-
+/*
+		// TODO: Implement check to see if retracing steps will get us closer
+		if (closestApproach < distanceToTarget) {
+			
+			Optional<ExploreNode>  bestOptional = explorePath.stream()
+				.filter(en -> en.gethCost() == closestApproach)
+				.sorted( (en1,  en2) -> Integer.compare(Math.abs(en1.getgCost() - exploreNode.getgCost())
+						, Math.abs(en2.getgCost() - exploreNode.getgCost()))).findFirst();
+			ExploreNode bestNode = bestOptional.isPresent() ? bestOptional.get() : null;
+			if (bestNode != null) {
+				System.out.println(String.format("Current %d, closest %d is %d away"
+						, distanceToTarget, closestApproach, Math.abs(bestNode.getgCost() - exploreNode.getgCost())));
+				System.out.println("Benefit: " + (distanceToTarget - closestApproach -  Math.abs(bestNode.getgCost() - exploreNode.getgCost())));
+			}			
+		} else {
+			
+			closestApproach = distanceToTarget;
+		}
+*/		
+		
 		exploreNode.close();
 
-		// Update any open nodes if this is a shorter route
+		// Update any open nodes
 		explorationState.getNeighbours().stream().filter(ns -> openNodeExists(ns.getId()))
-				.filter(ns -> getExploreNodeById(ns.getId()).getgCost() > exploreNode.getgCost() + 1)
+//				.filter(ns -> getExploreNodeById(ns.getId()).getgCost() > exploreNode.getgCost() + 1)
 				.forEach(ns -> updateExploreNode(getExploreNodeById(ns.getId()), exploreNode));
 
 		// Add the neighbours to the open list
@@ -91,9 +115,6 @@ public class Explorer {
 				.filter(ns -> !nodeExists(ns.getId()))
 				.forEach(ns -> explorePath.add(new ExploreNode(ns.getId(), exploreNode.getId(),
 						exploreNode.getgCost() + 1, ns.getDistanceToTarget())));
-
-		// TODO: Implement check to see if retracing steps will get us closer
-
 
 		boolean goBack = !explorePath.stream()
 				.filter(en -> en.getParentId() == exploreNode.getId()) 
@@ -180,6 +201,10 @@ public class Explorer {
 	}
 	
 	private void implementEscapePlan(EscapePath escapePlan) {
+		
+		//for(Node n : escapePlan.getPath()) {
+		//	System.out.println(String.format("Move to r%d:c%d", n.getTile().getRow(), n.getTile().getColumn()));
+		//}
 
 		escapePlan.getPath().stream().forEach(e -> followPath(e));
 	}

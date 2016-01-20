@@ -25,7 +25,7 @@ public abstract class AbstractEscapePathFinder implements EscapePathFinder {
 	/**
 	 * Estimate of average edge length
 	 */
-	double avgLength = 10;
+	double avgLength = 8;
 	/**
 	 * The number of escape routes found. Useful for testing
 	 */
@@ -52,7 +52,7 @@ public abstract class AbstractEscapePathFinder implements EscapePathFinder {
 		return Math.sqrt((rowDist * rowDist) + (colDist * colDist));
 	}
 
-	void setEscapeRoute(EscapePath p) {
+	synchronized void setEscapeRoute(EscapePath p) {
 
 		numberOfPathsFound++;
 		// Save the path if it is valid and more valuable than the existing one
@@ -64,13 +64,10 @@ public abstract class AbstractEscapePathFinder implements EscapePathFinder {
 	}
 	boolean isInRange(Node n, int pLength) {
 
-		// Estimate if the node is too far from the exit to possibly reach
-		int nRow = n.getTile().getRow();
-		int nCol = n.getTile().getColumn();
-		int rowDist = nRow - exitRow;
-		int colDist = nCol - exitCol;
-		Double d = Math.sqrt((rowDist * rowDist) + (colDist * colDist));
-		d *= this.avgLength;
-		return d + pLength < escapeState.getTimeRemaining();
+		// Estimate if the node is too far from the exit to probably reach
+		int rDist = Math.abs(n.getTile().getRow() - exitRow) + (n.getTile().getColumn() - exitCol);
+//		Double d = Math.sqrt((rowDist * rowDist) + (colDist * colDist));
+		rDist *= avgLength;
+		return rDist + pLength < escapeState.getTimeRemaining();
 	}
 }
