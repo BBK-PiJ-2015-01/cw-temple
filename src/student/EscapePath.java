@@ -5,6 +5,12 @@ import java.util.List;
 
 import game.Node;
 
+/**
+ * An instance of a path that will escape the cavern
+ * 
+ * @author sbaird02
+ *
+ */
 public class EscapePath {
 
 	private int length;
@@ -12,14 +18,27 @@ public class EscapePath {
 	private Node node;
 	private List<Node> path;
 
+	/**
+	 * Creates an path from the supplied node. Note that any gold will need to
+	 * be added manually.
+	 * 
+	 * @param node
+	 *            the starting position of the path
+	 */
 	public EscapePath(Node node) {
 
 		this.node = node;
-
 		path = new ArrayList<>();
 		path.add(node);
 	}
 
+	/**
+	 * Creates an path from the supplied path. This is essentially a clone of
+	 * the supplied argument be added manually.
+	 * 
+	 * @param node
+	 *            an EscapePath to copy
+	 */
 	public EscapePath(EscapePath escapePath) {
 
 		length = escapePath.length;
@@ -84,7 +103,7 @@ public class EscapePath {
 		}
 		if (getClass() != obj.getClass())
 			return false;
-		
+
 		EscapePath other = (EscapePath) obj;
 		if (gold != other.gold) {
 			return false;

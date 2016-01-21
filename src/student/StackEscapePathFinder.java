@@ -26,9 +26,8 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 	private Node exit;
 
 	private long timeout; // Elapsed time of exit planning
-	
-	private final int STACK_TIMEOUT_IN_MILLIS = 100;
 
+	private final int STACK_TIMEOUT_IN_MILLIS = 100;
 
 	// private BlockingDeque<EscapePath> stack;
 	private SortedSet<EscapePath> stack;
@@ -50,7 +49,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 		escapeState = state;
 		exit = state.getExit();
-//		exitCovering = exit.getNeighbours().stream().findFirst().get();
+		// exitCovering = exit.getNeighbours().stream().findFirst().get();
 		// The exit nodes have only one neighbour
 		// exitCovering = exit.getNeighbours().stream().findFirst().get();
 		// Set the shortest escape route as a default
@@ -136,23 +135,21 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 				// Would reversing this path give us a new best solution?
 				if (reversePathConditions(p)) {
 
-//					EscapePath cp = new EscapePath(p);
-//					// Add the route back
-//					for (int i = cp.getPath().size() - 2; i >= 0; i--) {
-//						cp.addNode(cp.getPath().get(i));
-//					}
-//					cp.addLength(cp.getLength());
-//					// Add the remainder of the shortest escape path
-//					for (Node n : shortestPathCompletion) {
-//						cp.addNode(n);
-//					}
-//					cp.addGold(shortTestPathCompletionGold);
-//					cp.addLength(shortestEscapePath.getLength());
-//					setEscapeRoute(cp);
-					reversePathToExit(p, p.getNode());
+					// EscapePath cp = new EscapePath(p);
+					// // Add the route back
+					// for (int i = cp.getPath().size() - 2; i >= 0; i--) {
+					// cp.addNode(cp.getPath().get(i));
+					// }
+					// cp.addLength(cp.getLength());
+					// // Add the remainder of the shortest escape path
+					// for (Node n : shortestPathCompletion) {
+					// cp.addNode(n);
+					// }
+					// cp.addGold(shortTestPathCompletionGold);
+					// cp.addLength(shortestEscapePath.getLength());
+					// setEscapeRoute(cp);
+//					reversePathToExit(p, p.getNode());
 				}
-
-
 
 				// If it's too far to go now then abandon this path
 				if (p.getLength() >= escapeState.getTimeRemaining()) {
@@ -180,9 +177,11 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 						} else {
 							// If rejoining the path then reverse out
 							if (p.getPath().contains(nextNode)) {
-								reversePathToExit(p, nextNode);
+								EscapePath np = createNewEscapePath(p, nextNode, e);
+								np.addGold(nextNode.getTile().getGold() * -1); // Gold already added in creation
+								reversePathToExit(np, nextNode);
 								continue;
-							}							
+							}
 							if (continuePath == null) {
 								continuePath = createNewEscapePath(p, nextNode, e);
 							} else {
@@ -224,7 +223,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			if (p.getLength() + e.length > escapeState.getTimeRemaining()) {
 				return false; // Too far
 			}
-//			return !p.getPath().contains(n);
+			// return !p.getPath().contains(n);
 			return true;
 		}
 
@@ -232,15 +231,15 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 			return getNextPath(true);
 		}
-		
+
 		private EscapePath getNextPath(boolean wait) {
-			
+
 			if (stack.isEmpty() && wait) {
 				try {
 					Thread.sleep(STACK_TIMEOUT_IN_MILLIS);
 					return getNextPath(false);
 				} catch (InterruptedException e) {
-			
+
 					System.out.println("Sleep was interrupted");
 					return null;
 				}
@@ -249,7 +248,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			if (returnPath != null) {
 				pathsFollowed++;
 				stack.remove(returnPath);
-			}			
+			}
 			return returnPath;
 		}
 
@@ -276,29 +275,33 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			np.addNode(n);
 			return np;
 		}
-		
+
 		private void reversePathToExit(EscapePath p, Node n) {
-			
+
 			// If called in error
-				if (!p.getPath().contains(n)) {
-					return;
-				}
-				EscapePath cp = new EscapePath(p);
-				// Find the node in the path
-				int indexOfNode = p.getPath().indexOf(n);
-				// Add the route back
-				for (int i = indexOfNode - 1; i >= 0; i--) {
-					cp.addNode(cp.getPath().get(i));
-				}
-				cp.addLength(cp.getLength());
-				// Add the remainder of the shortest escape path
-				for (Node spn : shortestPathCompletion) {
-					cp.addNode(spn);
-				}
-				cp.addGold(shortTestPathCompletionGold);
-				cp.addLength(shortestEscapePath.getLength());
-				setEscapeRoute(cp);			
+			if (!p.getPath().contains(n)) {
+				return;
+			}
+			EscapePath cp = new EscapePath(p);
+			// Find the node in the path
+			int indexOfNode = cp.getPath().indexOf(n);
+			// Add the route back
+			Node lastNode = n;
+			for (int i = indexOfNode - 1; i >= 0; i--) {
+				Node nextNode = cp.getPath().get(i);
+				cp.addNode(nextNode);
+				cp.addLength(lastNode.getEdge(nextNode).length());
+				lastNode = nextNode;
+			}
+			// Add the remainder of the shortest escape path
+			for (Node spn : shortestPathCompletion) {
+				cp.addNode(spn);
+			}
+			cp.addGold(shortTestPathCompletionGold);
+			cp.addLength(shortestEscapePath.getLength());
+			setEscapeRoute(cp);
 		}
+
 		private int escapePathComparator(Edge e1, Edge e2) {
 
 			Node o1 = e1.getDest();
@@ -323,7 +326,8 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 				returnValue = d1.compareTo(d2);
 			}
 
-			if (returnValue == 0) { // Finally compare on id to enforce determinism
+			if (returnValue == 0) { // Finally compare on id to enforce
+									// determinism
 				returnValue = Long.compare(o2.getId(), o1.getId());
 			}
 			return returnValue;
