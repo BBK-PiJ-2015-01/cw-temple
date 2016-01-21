@@ -202,9 +202,9 @@ public class Explorer {
 	
 	private void implementEscapePlan(EscapePath escapePlan) {
 		
-		//for(Node n : escapePlan.getPath()) {
-		//	System.out.println(String.format("Move to r%d:c%d", n.getTile().getRow(), n.getTile().getColumn()));
-		//}
+//		for(Node n : escapePlan.getPath()) {
+//			System.out.println(String.format("Move to r%d:c%d", n.getTile().getRow(), n.getTile().getColumn()));
+//		}
 
 		escapePlan.getPath().stream().forEach(e -> followPath(e));
 	}

@@ -26,6 +26,8 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 	private Node exit;
 
 	private long timeout; // Elapsed time of exit planning
+	
+	private final int STACK_TIMEOUT_IN_MILLIS = 100;
 
 
 	// private BlockingDeque<EscapePath> stack;
@@ -96,8 +98,6 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		pool.shutdown();
 	}
 
-
-
 	class SearchThread implements Callable<Object> {
 
 		private static final long serialVersionUID = 8473109576846837452L;
@@ -136,19 +136,20 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 				// Would reversing this path give us a new best solution?
 				if (reversePathConditions(p)) {
 
-					EscapePath cp = new EscapePath(p);
-					// Add the route back
-					for (int i = cp.getPath().size() - 2; i >= 0; i--) {
-						cp.addNode(cp.getPath().get(i));
-					}
-					cp.addLength(cp.getLength());
-					// Add the remainder of the shortest escape path
-					for (Node n : shortestPathCompletion) {
-						cp.addNode(n);
-					}
-					cp.addGold(shortTestPathCompletionGold);
-					cp.addLength(shortestEscapePath.getLength());
-					setEscapeRoute(cp);
+//					EscapePath cp = new EscapePath(p);
+//					// Add the route back
+//					for (int i = cp.getPath().size() - 2; i >= 0; i--) {
+//						cp.addNode(cp.getPath().get(i));
+//					}
+//					cp.addLength(cp.getLength());
+//					// Add the remainder of the shortest escape path
+//					for (Node n : shortestPathCompletion) {
+//						cp.addNode(n);
+//					}
+//					cp.addGold(shortTestPathCompletionGold);
+//					cp.addLength(shortestEscapePath.getLength());
+//					setEscapeRoute(cp);
+					reversePathToExit(p, p.getNode());
 				}
 
 
@@ -177,6 +178,11 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 						if (exit.equals(nextNode)) {
 							setEscapeRoute(createNewEscapePath(p, nextNode, e));
 						} else {
+							// If rejoining the path then reverse out
+							if (p.getPath().contains(nextNode)) {
+								reversePathToExit(p, nextNode);
+								continue;
+							}							
 							if (continuePath == null) {
 								continuePath = createNewEscapePath(p, nextNode, e);
 							} else {
@@ -218,17 +224,32 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			if (p.getLength() + e.length > escapeState.getTimeRemaining()) {
 				return false; // Too far
 			}
-			return !p.getPath().contains(n);
+//			return !p.getPath().contains(n);
+			return true;
 		}
 
 		private EscapePath getNextPath() {
 
-			pathsFollowed++;
-			if (stack.isEmpty()) {
-				return null;
+			return getNextPath(true);
+		}
+		
+		private EscapePath getNextPath(boolean wait) {
+			
+			if (stack.isEmpty() && wait) {
+				try {
+					Thread.sleep(STACK_TIMEOUT_IN_MILLIS);
+					return getNextPath(false);
+				} catch (InterruptedException e) {
+			
+					System.out.println("Sleep was interrupted");
+					return null;
+				}
 			}
-			EscapePath returnPath = stack.first();
-			stack.remove(returnPath);
+			EscapePath returnPath = stack.isEmpty() ? null : stack.first();
+			if (returnPath != null) {
+				pathsFollowed++;
+				stack.remove(returnPath);
+			}			
 			return returnPath;
 		}
 
@@ -254,6 +275,29 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			np.addLength(e.length);
 			np.addNode(n);
 			return np;
+		}
+		
+		private void reversePathToExit(EscapePath p, Node n) {
+			
+			// If called in error
+				if (!p.getPath().contains(n)) {
+					return;
+				}
+				EscapePath cp = new EscapePath(p);
+				// Find the node in the path
+				int indexOfNode = p.getPath().indexOf(n);
+				// Add the route back
+				for (int i = indexOfNode - 1; i >= 0; i--) {
+					cp.addNode(cp.getPath().get(i));
+				}
+				cp.addLength(cp.getLength());
+				// Add the remainder of the shortest escape path
+				for (Node spn : shortestPathCompletion) {
+					cp.addNode(spn);
+				}
+				cp.addGold(shortTestPathCompletionGold);
+				cp.addLength(shortestEscapePath.getLength());
+				setEscapeRoute(cp);			
 		}
 		private int escapePathComparator(Edge e1, Edge e2) {
 
