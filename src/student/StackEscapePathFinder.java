@@ -29,7 +29,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 	// private BlockingDeque<EscapePath> stack;
 	private SortedSet<EscapePath> stack;
-	
+
 	private int shortestPathLength;
 
 	private List<Node> shortestPathCompletion;
@@ -59,7 +59,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 		// Allow ourselves n-seconds to formulate a plan
 		timeout = System.currentTimeMillis() + this.MAX_TIME_IN_MS;
-		
+
 		// Formulate the plan
 		populateStack();
 		buildEscapePaths();
@@ -79,6 +79,13 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		stack.add(p);
 	}
 
+	/*
+	 * Although the stack is actually thread safe, taking an item from an empty
+	 * collection throws an exception. I do an isEmpty() consistency check
+	 * beforehand but with multiple threads the status of the collection can
+	 * change between isEmpty() and first() so access is wrapped in this method
+	 * to provide transactional safety
+	 */
 	synchronized private EscapePath removeFromStack() {
 
 		EscapePath returnPath = stack.isEmpty() ? null : stack.first();
@@ -105,8 +112,8 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 	}
 
 	/**
-	 * Class to be used in multi-threaded approach. This will pop incomplete paths from the stack
-	 * and attempt to resolve them
+	 * Class to be used in multi-threaded approach. This will pop incomplete
+	 * paths from the stack and attempt to resolve them
 	 * 
 	 * @author sbaird02
 	 *
@@ -160,7 +167,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 				// Order the exits appropriately
 				List<Edge> newExits = new ArrayList<Edge>(p.getNode().getExits());
 				Collections.sort(newExits, escapePathComparator);
-				
+
 				EscapePath continuePath = null;
 				for (Edge e : newExits) {
 
@@ -210,7 +217,8 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		}
 
 		/*
-		 * Not currently sync'd
+		 * Not currently sync'd but as it's an atomic method then the SortedTree
+		 * can take care of it
 		 */
 		private void stackPath(EscapePath p) {
 
@@ -241,14 +249,13 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		}
 
 		/*
-		 * Collect the highest value unresolved path. Synchronized rather than
-		 * try/catch
+		 * Collect the highest value unresolved path. See notes above on
+		 * synchronization
 		 */
 		private EscapePath getNextPath() {
 
-			// Use synchronized accessor
 			EscapePath returnPath = removeFromStack();
-			
+
 			// Try sleeping and looping until timeout
 			if (returnPath == null) {
 				try {
@@ -262,6 +269,9 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			return returnPath;
 		}
 
+		/*
+		 * Convenience method for creating a new path
+		 */
 		private EscapePath createNewEscapePath(EscapePath p, Node n, Edge e) {
 			EscapePath np = new EscapePath(p);
 			np.addGold(n.getTile().getGold());
@@ -300,6 +310,9 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			setEscapeRoute(cp);
 		}
 
+		/*
+		 * Comparator to sort the immediate neighbours in the preferential order
+		 */
 		private int escapePathComparator(Edge e1, Edge e2) {
 
 			Node o1 = e1.getDest();
