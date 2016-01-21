@@ -1,10 +1,11 @@
 package student;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -18,7 +19,7 @@ import game.Node;
 
 /**
  * Path finder which uses the shortest path as a base. New paths are created by
- * iterating from the current node. 
+ * iterating from the current node.
  */
 public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
@@ -26,12 +27,9 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 	private long timeout; // Elapsed time of exit planning
 
-	// Comparator for evaluating exit paths
-	private Comparator<Edge> escapePathComparator = (e1, e2) -> escapePathComparator(e1, e2);
 
-
-	private BlockingDeque<EscapePath> stack;
-	// private Deque<EscapePath> stack;
+	// private BlockingDeque<EscapePath> stack;
+	private SortedSet<EscapePath> stack;
 
 	private int shortestPathLength;
 
@@ -50,6 +48,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 		escapeState = state;
 		exit = state.getExit();
+//		exitCovering = exit.getNeighbours().stream().findFirst().get();
 		// The exit nodes have only one neighbour
 		// exitCovering = exit.getNeighbours().stream().findFirst().get();
 		// Set the shortest escape route as a default
@@ -66,14 +65,14 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		populateStack();
 		buildEscapePaths();
 
-		System.out.println(String.format("%d additional paths found", numberOfPathsFound));
+		System.out.println(String.format("%d additional paths found, %d unresolved", numberOfPathsFound, stack.size()));
 		return escapePath;
 	}
 
 	private void populateStack() {
 
-		// stack = new ConcurrentLinkedDeque<>();
-		stack = new LinkedBlockingDeque<>();
+		stack = Collections.synchronizedSortedSet(new TreeSet<>(new EscapePathOrderComparator()));
+		// stack = new LinkedBlockingDeque<>();
 
 		Node n = escapeState.getCurrentNode();
 		EscapePath p = new EscapePath(n);
@@ -92,45 +91,18 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		try {
 			pool.invokeAll(threads);
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		pool.shutdown();
 	}
 
-	private int escapePathComparator(Edge e1, Edge e2) {
 
-		Node o1 = e1.getDest();
-		Node o2 = e1.getDest();
-
-		// Primary comparison is Gold
-		int returnValue = Integer.compare(o2.getTile().getGold(), o1.getTile().getGold());
-
-		if (returnValue == 0) { // Edge length
-			returnValue = Integer.compare(e1.length(), e2.length());
-		}
-		int rowDist = o1.getTile().getRow() - exit.getTile().getRow();
-		int colDist = o1.getTile().getColumn() - exit.getTile().getColumn();
-		Double d1 = Math.sqrt((rowDist * rowDist) + (colDist * colDist));
-
-		o2 = e2.getDest();
-		rowDist = o2.getTile().getRow() - exit.getTile().getRow();
-		colDist = o2.getTile().getColumn() - exit.getTile().getColumn();
-		Double d2 = Math.sqrt((rowDist * rowDist) + (colDist * colDist));
-
-		if (returnValue == 0) { // Distance from exit
-			returnValue = d1.compareTo(d2);
-		}
-
-		if (returnValue == 0) { // Finally compare on id to enforce determinism
-			returnValue = Long.compare(o2.getId(), o1.getId());
-		}
-		return returnValue;
-	}
 
 	class SearchThread implements Callable<Object> {
 
 		private static final long serialVersionUID = 8473109576846837452L;
+		// Comparator for evaluating exit paths
+		private Comparator<Edge> escapePathComparator = (e1, e2) -> escapePathComparator(e1, e2);
 
 		int pathsCreated;
 		int pathsFollowed;
@@ -179,14 +151,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 					setEscapeRoute(cp);
 				}
 
-				// If the exits are covered then back out
-				while (p.getPath().containsAll(p.getNode().getNeighbours())) {
-					int firstIndexOfNode = p.getPath().indexOf(p.getNode());
-					Node goBackNode = p.getPath().get(firstIndexOfNode - 1);
-					Edge goBackEdge = p.getNode().getEdge(goBackNode);
-					p.addNode(goBackNode);
-					p.addLength(goBackEdge.length());
-				}
+
 
 				// If it's too far to go now then abandon this path
 				if (p.getLength() >= escapeState.getTimeRemaining()) {
@@ -197,7 +162,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 				// If it's probably out of range then get another path
 				if (!isInRange(p.getNode(), p.getLength())) {
 					// Queue this rather than stack it
-					stack.add(p);
+					// stack.add(p);
 					p = getNextPath();
 					continue;
 				}
@@ -236,7 +201,8 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		private void stackPath(EscapePath p) {
 
 			pathsCreated++;
-			stack.push(p);
+			// stack.push(p);
+			stack.add(p);
 		}
 
 		private boolean reversePathConditions(EscapePath p) {
@@ -257,16 +223,29 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 		private EscapePath getNextPath() {
 
-			try {
-				pathsFollowed++;
-				EscapePath returnPath = stack.pollFirst(1000, TimeUnit.MILLISECONDS);
-				return returnPath;
-				// return (stack.pop());
-			} catch (InterruptedException e) {
-				// The stack is empty so quit
-				System.out.println(String.format("%s: Empty stack", Thread.currentThread().getName()));
+			pathsFollowed++;
+			if (stack.isEmpty()) {
 				return null;
 			}
+			EscapePath returnPath = stack.first();
+			stack.remove(returnPath);
+			return returnPath;
+		}
+
+		private EscapePath _getNextPath() {
+
+			// try {
+			// pathsFollowed++;
+			// EscapePath returnPath = stack.pollFirst(1000,
+			// TimeUnit.MILLISECONDS);
+			// return returnPath;
+			// return (stack.pop());
+			// } catch (InterruptedException e) {
+			// The stack is empty so quit
+			// System.out.println(String.format("%s: Empty stack",
+			// Thread.currentThread().getName()));
+			return null;
+			// }
 		}
 
 		private EscapePath createNewEscapePath(EscapePath p, Node n, Edge e) {
@@ -275,6 +254,35 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			np.addLength(e.length);
 			np.addNode(n);
 			return np;
+		}
+		private int escapePathComparator(Edge e1, Edge e2) {
+
+			Node o1 = e1.getDest();
+			Node o2 = e1.getDest();
+
+			// Primary comparison is Gold
+			int returnValue = Integer.compare(o2.getTile().getGold(), o1.getTile().getGold());
+
+			if (returnValue == 0) { // Edge length
+				returnValue = Integer.compare(e1.length(), e2.length());
+			}
+			int rowDist = o1.getTile().getRow() - exit.getTile().getRow();
+			int colDist = o1.getTile().getColumn() - exit.getTile().getColumn();
+			Double d1 = Math.sqrt((rowDist * rowDist) + (colDist * colDist));
+
+			o2 = e2.getDest();
+			rowDist = o2.getTile().getRow() - exit.getTile().getRow();
+			colDist = o2.getTile().getColumn() - exit.getTile().getColumn();
+			Double d2 = Math.sqrt((rowDist * rowDist) + (colDist * colDist));
+
+			if (returnValue == 0) { // Distance from exit
+				returnValue = d1.compareTo(d2);
+			}
+
+			if (returnValue == 0) { // Finally compare on id to enforce determinism
+				returnValue = Long.compare(o2.getId(), o1.getId());
+			}
+			return returnValue;
 		}
 	}
 }

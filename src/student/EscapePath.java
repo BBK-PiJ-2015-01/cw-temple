@@ -1,6 +1,6 @@
 package student;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 import game.Node;
@@ -16,7 +16,7 @@ public class EscapePath {
 
 		this.node = node;
 
-		path = new LinkedList<>();
+		path = new ArrayList<>();
 		path.add(node);
 	}
 
@@ -25,7 +25,7 @@ public class EscapePath {
 		length = escapePath.length;
 		gold = escapePath.gold;
 		node = escapePath.node;
-		path = new LinkedList<>(escapePath.path);
+		path = new ArrayList<>(escapePath.path);
 
 	}
 
@@ -76,28 +76,25 @@ public class EscapePath {
 
 	@Override
 	public boolean equals(Object obj) {
-		if (this == obj)
+		if (this == obj) {
 			return true;
-		if (obj == null)
+		}
+		if (obj == null) {
 			return false;
+		}
 		if (getClass() != obj.getClass())
 			return false;
+		
 		EscapePath other = (EscapePath) obj;
-		if (gold != other.gold)
+		if (gold != other.gold) {
 			return false;
-		if (length != other.length)
+		}
+		if (length != other.length) {
 			return false;
-		if (node == null) {
-			if (other.node != null)
-				return false;
-		} else if (!node.equals(other.node))
+		}
+		if (node == null && other.node != null) {
 			return false;
-		if (path == null) {
-			if (other.path != null)
-				return false;
-		} else if (!path.equals(other.path))
-			return false;
-		return true;
+		}
+		return node.getId() == other.node.getId();
 	}
-
 }

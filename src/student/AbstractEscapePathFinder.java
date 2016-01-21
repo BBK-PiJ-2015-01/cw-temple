@@ -55,8 +55,10 @@ public abstract class AbstractEscapePathFinder implements EscapePathFinder {
 	synchronized void setEscapeRoute(EscapePath p) {
 
 		numberOfPathsFound++;
+		int currentGold = escapePath == null ? -1 : escapePath.getGold();
+		int currentLength = escapePath == null ? Integer.MAX_VALUE : escapePath.getLength();
 		// Save the path if it is valid and more valuable than the existing one
-		if (p.getGold() > (escapePath == null ? -1 : escapePath.getGold())) {
+		if (p.getGold() > currentGold || (p.getGold()  == currentGold && p.getLength() < currentLength)) {
 			if (p.getLength() <= escapeState.getTimeRemaining()) {
 				escapePath = p;
 			}
