@@ -3,11 +3,9 @@ package student;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 
 import game.EscapeState;
 import game.ExplorationState;
-import game.GameState;
 import game.Node;
 
 public class Explorer {

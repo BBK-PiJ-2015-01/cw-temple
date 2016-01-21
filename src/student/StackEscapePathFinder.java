@@ -6,12 +6,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
-import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.TimeUnit;
 
 import game.Edge;
 import game.EscapeState;
@@ -27,11 +24,12 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 	private long timeout; // Elapsed time of exit planning
 
+	// Wait time for empty stack reads
 	private final int STACK_TIMEOUT_IN_MILLIS = 100;
 
 	// private BlockingDeque<EscapePath> stack;
 	private SortedSet<EscapePath> stack;
-
+	
 	private int shortestPathLength;
 
 	private List<Node> shortestPathCompletion;
@@ -49,20 +47,20 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 		escapeState = state;
 		exit = state.getExit();
-		// exitCovering = exit.getNeighbours().stream().findFirst().get();
-		// The exit nodes have only one neighbour
-		// exitCovering = exit.getNeighbours().stream().findFirst().get();
-		// Set the shortest escape route as a default
+		// Get the shortest route out as a fall back
 		escapePath = new ShortestEscapePathFinder(state).findEscapePath(escapeState);
 		shortestEscapePath = escapePath;
 
-		// Set up the path from the start node to the exit
+		// Set up the shortest path from the start node to the exit
 		shortestPathCompletion = new ArrayList<>(escapePath.getPath());
 		shortestPathCompletion.remove(shortestPathCompletion.indexOf(state.getCurrentNode()));
 		shortTestPathCompletionGold = escapePath.getGold() - state.getCurrentNode().getTile().getGold();
 		shortestPathLength = escapePath.getLength();
 
+		// Allow ourselves n-seconds to formulate a plan
 		timeout = System.currentTimeMillis() + this.MAX_TIME_IN_MS;
+		
+		// Formulate the plan
 		populateStack();
 		buildEscapePaths();
 
@@ -81,6 +79,15 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		stack.add(p);
 	}
 
+	synchronized private EscapePath removeFromStack() {
+
+		EscapePath returnPath = stack.isEmpty() ? null : stack.first();
+		if (returnPath != null) {
+			stack.remove(returnPath);
+		}
+		return returnPath;
+	}
+
 	private void buildEscapePaths() {
 
 		int maxThreads = Runtime.getRuntime().availableProcessors();
@@ -97,9 +104,18 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		pool.shutdown();
 	}
 
+	/**
+	 * Class to be used in multi-threaded approach. This will pop incomplete paths from the stack
+	 * and attempt to resolve them
+	 * 
+	 * @author sbaird02
+	 *
+	 */
 	class SearchThread implements Callable<Object> {
 
+		@SuppressWarnings("unused")
 		private static final long serialVersionUID = 8473109576846837452L;
+
 		// Comparator for evaluating exit paths
 		private Comparator<Edge> escapePathComparator = (e1, e2) -> escapePathComparator(e1, e2);
 
@@ -118,9 +134,6 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			} catch (Throwable t) {
 				t.printStackTrace();
 			}
-			// System.out.println(String.format("%s: Created %d paths, followed
-			// %d", Thread.currentThread().getName(),
-			// pathsCreated, pathsFollowed));
 			return null;
 		}
 
@@ -132,63 +145,56 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 					return;
 				}
 
-				// Would reversing this path give us a new best solution?
-				if (reversePathConditions(p)) {
-
-					// EscapePath cp = new EscapePath(p);
-					// // Add the route back
-					// for (int i = cp.getPath().size() - 2; i >= 0; i--) {
-					// cp.addNode(cp.getPath().get(i));
-					// }
-					// cp.addLength(cp.getLength());
-					// // Add the remainder of the shortest escape path
-					// for (Node n : shortestPathCompletion) {
-					// cp.addNode(n);
-					// }
-					// cp.addGold(shortTestPathCompletionGold);
-					// cp.addLength(shortestEscapePath.getLength());
-					// setEscapeRoute(cp);
-//					reversePathToExit(p, p.getNode());
-				}
-
-				// If it's too far to go now then abandon this path
+				// If the path is too long then abandon it
 				if (p.getLength() >= escapeState.getTimeRemaining()) {
 					p = getNextPath();
 					continue;
 				}
 
-				// If it's probably out of range then get another path
+				// If it's probably out of range then then abandon it
 				if (!isInRange(p.getNode(), p.getLength())) {
-					// Queue this rather than stack it
-					// stack.add(p);
 					p = getNextPath();
 					continue;
 				}
 
+				// Order the exits appropriately
 				List<Edge> newExits = new ArrayList<Edge>(p.getNode().getExits());
 				Collections.sort(newExits, escapePathComparator);
+				
 				EscapePath continuePath = null;
 				for (Edge e : newExits) {
 
 					Node nextNode = e.getDest();
 					if (continuePathConditions(p, e, nextNode)) {
+
 						if (exit.equals(nextNode)) {
 							setEscapeRoute(createNewEscapePath(p, nextNode, e));
 						} else {
-							// If rejoining the path then reverse out
-							if (p.getPath().contains(nextNode)) {
+							// Determine this just once as it is an expensive
+							// operation
+							boolean nodeExistsInPath = p.getPath().contains(nextNode);
+
+							// Test rejoining the path and reversing out
+							if (reversePathConditions(p, nodeExistsInPath)) {
 								EscapePath np = createNewEscapePath(p, nextNode, e);
-								np.addGold(nextNode.getTile().getGold() * -1); // Gold already added in creation
+								// Take away the gold added in creation
+								np.addGold(nextNode.getTile().getGold() * -1);
 								reversePathToExit(np, nextNode);
 								continue;
 							}
+
+							// If not reversed out then we don't want to
+							// continue with this
+							if (nodeExistsInPath) {
+								continue;
+							}
+
+							// Continue with the best option and stack the rest
 							if (continuePath == null) {
 								continuePath = createNewEscapePath(p, nextNode, e);
 							} else {
 								EscapePath np = createNewEscapePath(p, nextNode, e);
 								stackPath(np);
-								// pathsCreated++;
-								// stack.add(p);
 							}
 						}
 					}
@@ -203,69 +209,57 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			}
 		}
 
+		/*
+		 * Not currently sync'd
+		 */
 		private void stackPath(EscapePath p) {
 
 			pathsCreated++;
-			// stack.push(p);
 			stack.add(p);
 		}
 
-		private boolean reversePathConditions(EscapePath p) {
+		/*
+		 * Check to see if we want to escape back down the way we came
+		 */
+		private boolean reversePathConditions(EscapePath p, boolean nodeExistsInPath) {
 
+			if (!nodeExistsInPath) {
+				return false;
+			}
 			if (p.getLength() == 0 || p.getGold() + shortTestPathCompletionGold < escapePath.getGold()) {
 				return false;
 			}
-			return p.getLength() * 2 + shortestPathLength < escapeState.getTimeRemaining();
+			return p.getLength() + shortestPathLength < escapeState.getTimeRemaining();
 		}
 
+		/*
+		 * Check to see if we want to pursue this path
+		 */
 		private boolean continuePathConditions(EscapePath p, Edge e, Node n) {
 
-			if (p.getLength() + e.length > escapeState.getTimeRemaining()) {
-				return false; // Too far
-			}
-			// return !p.getPath().contains(n);
-			return true;
+			return p.getLength() + e.length <= escapeState.getTimeRemaining();
 		}
 
+		/*
+		 * Collect the highest value unresolved path. Synchronized rather than
+		 * try/catch
+		 */
 		private EscapePath getNextPath() {
 
-			return getNextPath(true);
-		}
-
-		private EscapePath getNextPath(boolean wait) {
-
-			if (stack.isEmpty() && wait) {
+			// Use synchronized accessor
+			EscapePath returnPath = removeFromStack();
+			
+			// Try sleeping and looping until timeout
+			if (returnPath == null) {
 				try {
 					Thread.sleep(STACK_TIMEOUT_IN_MILLIS);
-					return getNextPath(false);
+					returnPath = removeFromStack();
 				} catch (InterruptedException e) {
-
-					System.out.println("Sleep was interrupted");
-					return null;
+					//
+					e.printStackTrace();
 				}
 			}
-			EscapePath returnPath = stack.isEmpty() ? null : stack.first();
-			if (returnPath != null) {
-				pathsFollowed++;
-				stack.remove(returnPath);
-			}
 			return returnPath;
-		}
-
-		private EscapePath _getNextPath() {
-
-			// try {
-			// pathsFollowed++;
-			// EscapePath returnPath = stack.pollFirst(1000,
-			// TimeUnit.MILLISECONDS);
-			// return returnPath;
-			// return (stack.pop());
-			// } catch (InterruptedException e) {
-			// The stack is empty so quit
-			// System.out.println(String.format("%s: Empty stack",
-			// Thread.currentThread().getName()));
-			return null;
-			// }
 		}
 
 		private EscapePath createNewEscapePath(EscapePath p, Node n, Edge e) {
@@ -276,6 +270,10 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			return np;
 		}
 
+		/*
+		 * Reverses the path from the given node and follows the shortest route
+		 * out
+		 */
 		private void reversePathToExit(EscapePath p, Node n) {
 
 			// If called in error
@@ -325,9 +323,8 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			if (returnValue == 0) { // Distance from exit
 				returnValue = d1.compareTo(d2);
 			}
-
-			if (returnValue == 0) { // Finally compare on id to enforce
-									// determinism
+			// Finally compare on id to enforce determinism
+			if (returnValue == 0) {
 				returnValue = Long.compare(o2.getId(), o1.getId());
 			}
 			return returnValue;
