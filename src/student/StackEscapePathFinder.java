@@ -9,6 +9,9 @@ import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 import game.Edge;
 import game.EscapeState;
@@ -36,6 +39,9 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 	private int shortTestPathCompletionGold;
 
 	private EscapePath shortestEscapePath;
+	
+	// TEMP
+	static UnaryOperator<Node> deadEndCombinator;
 
 	public StackEscapePathFinder(EscapeState state) {
 
@@ -45,6 +51,15 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 	@Override
 	public EscapePath findEscapePath(EscapeState state) {
 
+//        LongStream.range(0,11)
+//       .map(deadEndCombinator = i -> { 
+//                return i == 0 || i == 1
+//                    ? 1
+//                    : deadEndCombinator.applyAsLong(i - 2) + deadEndCombinator.applyAsLong(i - 1); 
+//                })
+//        .parallel()
+//        .forEachOrdered(e -> System.out.printf("%s  ", e));
+        
 		escapeState = state;
 		exit = state.getExit();
 		// Get the shortest route out as a fall back
@@ -58,7 +73,17 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		shortestPathLength = escapePath.getLength();
 
 		// Allow ourselves n-seconds to formulate a plan
-		timeout = System.currentTimeMillis() + this.MAX_TIME_IN_MS;
+		timeout = System.currentTimeMillis() +  MAX_TIME_IN_MS / 1;
+		
+		List<Node> deadNodes = state.getVertices().parallelStream()
+			.filter(dn -> dn.getExits().size() == 1 && dn.getTile().getGold() == 0)
+			.collect(Collectors.toList());
+		System.out.println(String.format("Found %d nodes to expand", deadNodes.size()));
+//		deadNodes.stream().map(deadEndCombinator = i -> { 
+//                return i == 0 || i == 1
+//                    ? 1
+//                    : deadEndCombinator.applyAsLong(i - 2) + deadEndCombinator.applyAsLong(i - 1); 
+//                })
 
 		// Formulate the plan
 		populateStack();
@@ -163,7 +188,25 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 					p = getNextPath();
 					continue;
 				}
-
+				
+				// If all our exits are block then go back until something is
+				// open and stack it
+				EscapePath returnPath = null;
+				Node endNode = p.getNode();
+				int currentIndex = p.getPath().size() -1;
+				while (p.getPath().containsAll(endNode.getNeighbours())) {
+					if (returnPath == null) {
+						returnPath = (EscapePath) p.clone();
+					}
+					endNode = p.getPath().get(--currentIndex);
+					int returnLength = returnPath.getNode().getEdge(endNode).length();
+					returnPath.addNode(endNode);	
+					returnPath.addLength(returnLength);
+				}
+				if (returnPath != null) {
+					stackPath(returnPath);
+				}
+				
 				// Order the exits appropriately
 				List<Edge> newExits = new ArrayList<Edge>(p.getNode().getExits());
 				Collections.sort(newExits, escapePathComparator);
@@ -257,7 +300,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			EscapePath returnPath = removeFromStack();
 
 			// Try sleeping and looping until timeout
-			if (returnPath == null) {
+			while (returnPath == null && System.currentTimeMillis() < timeout) {
 				try {
 					Thread.sleep(STACK_TIMEOUT_IN_MILLIS);
 					returnPath = removeFromStack();

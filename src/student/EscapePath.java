@@ -1,6 +1,7 @@
 package student;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
 import game.Node;
@@ -18,6 +19,9 @@ public class EscapePath {
 	private Node node;
 	private List<Node> path;
 
+	private EscapePath() {
+		
+	}
 	/**
 	 * Creates an path from the supplied node. Note that any gold will need to
 	 * be added manually.
@@ -28,7 +32,7 @@ public class EscapePath {
 	public EscapePath(Node node) {
 
 		this.node = node;
-		path = new ArrayList<>();
+		path = new LinkedList<>();
 		path.add(node);
 	}
 
@@ -44,7 +48,7 @@ public class EscapePath {
 		length = escapePath.length;
 		gold = escapePath.gold;
 		node = escapePath.node;
-		path = new ArrayList<>(escapePath.path);
+		path = new LinkedList<>(escapePath.path);
 
 	}
 
@@ -80,6 +84,16 @@ public class EscapePath {
 
 	public void setPath(List<Node> path) {
 		this.path = path;
+	}
+	
+	public Object clone() {
+		
+		EscapePath clone = new EscapePath();
+		clone.node = node;
+		clone.path = new LinkedList<>(path);
+		clone.gold = gold;
+		clone.length = length;
+		return clone;		
 	}
 
 	@Override

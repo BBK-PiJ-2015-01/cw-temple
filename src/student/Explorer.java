@@ -3,6 +3,7 @@ package student;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import game.EscapeState;
 import game.ExplorationState;
@@ -169,12 +170,15 @@ public class Explorer {
 	public void escape(EscapeState state) {
 		
 		escapeState = state;
-		
+
+		int tGold = state.getVertices().parallelStream().mapToInt(n -> n.getTile().getGold()).sum();
 		// Allow for different plans to be generated
 		EscapePathFinder pathFinder = new StackEscapePathFinder(state);
 //		EscapePathFinder pathFinder = new SimpleEscapePathFinder(state);
 
 		EscapePath escapePlan = pathFinder.findEscapePath(state);
+		double d = (double) escapePlan.getGold() / (double) tGold;
+		System.out.println(String.format("Collection ratio = %.2f%%", d * 100));
 		implementEscapePlan(escapePlan);
 	}
 	
