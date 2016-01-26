@@ -80,27 +80,7 @@ public class Explorer {
 		if (distanceToTarget == 0) {
 			explorationComplete = true;	// Cancel any further exploration
 			return;
-		}
-/*
-		// TODO: Implement check to see if retracing steps will get us closer
-		if (closestApproach < distanceToTarget) {
-			
-			Optional<ExploreNode>  bestOptional = explorePath.stream()
-				.filter(en -> en.gethCost() == closestApproach)
-				.sorted( (en1,  en2) -> Integer.compare(Math.abs(en1.getgCost() - exploreNode.getgCost())
-						, Math.abs(en2.getgCost() - exploreNode.getgCost()))).findFirst();
-			ExploreNode bestNode = bestOptional.isPresent() ? bestOptional.get() : null;
-			if (bestNode != null) {
-				System.out.println(String.format("Current %d, closest %d is %d away"
-						, distanceToTarget, closestApproach, Math.abs(bestNode.getgCost() - exploreNode.getgCost())));
-				System.out.println("Benefit: " + (distanceToTarget - closestApproach -  Math.abs(bestNode.getgCost() - exploreNode.getgCost())));
-			}			
-		} else {
-			
-			closestApproach = distanceToTarget;
-		}
-*/		
-		
+		}		
 		exploreNode.close();
 
 		// Update any open nodes
