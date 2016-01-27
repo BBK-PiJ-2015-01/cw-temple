@@ -3,15 +3,17 @@ package student;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
-import java.util.stream.LongStream;
 
 import game.Edge;
 import game.EscapeState;
@@ -40,8 +42,23 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 	private EscapePath shortestEscapePath;
 	
-	// TEMP
-	static UnaryOperator<Node> deadEndCombinator;
+	// Nodes we want to ignore
+	private  Set<Node> closedNodes;
+
+
+	private synchronized  void deadEndCombinator(Node n) {
+		
+
+		if (n.equals(escapeState.getCurrentNode()) 
+				|| n.getTile().getGold() != 0
+				|| n.getNeighbours().size() > 2) {
+			return;
+		}
+		closedNodes.add(n);
+			n.getNeighbours().stream()
+			.filter(nn -> !closedNodes.contains(nn))
+			.forEach(nn -> deadEndCombinator(nn));
+	}
 
 	public StackEscapePathFinder(EscapeState state) {
 
@@ -51,15 +68,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 	@Override
 	public EscapePath findEscapePath(EscapeState state) {
 
-//        LongStream.range(0,11)
-//       .map(deadEndCombinator = i -> { 
-//                return i == 0 || i == 1
-//                    ? 1
-//                    : deadEndCombinator.applyAsLong(i - 2) + deadEndCombinator.applyAsLong(i - 1); 
-//                })
-//        .parallel()
-//        .forEachOrdered(e -> System.out.printf("%s  ", e));
-        
+       
 		escapeState = state;
 		exit = state.getExit();
 		// Get the shortest route out as a fall back
@@ -74,16 +83,16 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 		// Allow ourselves n-seconds to formulate a plan
 		timeout = System.currentTimeMillis() +  MAX_TIME_IN_MS / 1;
-		
-		List<Node> deadNodes = state.getVertices().parallelStream()
-			.filter(dn -> dn.getExits().size() == 1 && dn.getTile().getGold() == 0)
-			.collect(Collectors.toList());
-		System.out.println(String.format("Found %d nodes to expand", deadNodes.size()));
-//		deadNodes.stream().map(deadEndCombinator = i -> { 
-//                return i == 0 || i == 1
-//                    ? 1
-//                    : deadEndCombinator.applyAsLong(i - 2) + deadEndCombinator.applyAsLong(i - 1); 
-//                })
+		closedNodes = Collections.synchronizedSet(new HashSet<>());
+		state.getVertices().parallelStream()
+		.filter(dn -> !exit.equals(dn))
+			.filter(dn -> dn.getExits().size() == 1 )
+			.collect(Collectors.toSet())
+			.stream().forEach(dn -> deadEndCombinator(dn));
+
+		System.out.println(String.format("Closed off %d nodes", closedNodes.size()));
+//		closedNodes.stream().forEach(xn -> System.out.println(String.format("Closed r%d:c%d"
+//				, xn.getTile().getRow(),xn.getTile().getColumn())));
 
 		// Formulate the plan
 		populateStack();
@@ -288,6 +297,9 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		 */
 		private boolean continuePathConditions(EscapePath p, Edge e, Node n) {
 
+			if (closedNodes.contains(n)) {
+				return false;
+			}
 			return p.getLength() + e.length <= escapeState.getTimeRemaining();
 		}
 
