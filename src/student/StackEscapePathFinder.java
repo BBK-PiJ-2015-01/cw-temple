@@ -3,16 +3,17 @@ package student;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.Supplier;
-import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 import game.Edge;
@@ -44,11 +45,13 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 	
 	// Nodes we want to ignore
 	private  Set<Node> closedNodes;
+	
+	// Weighted gold values for each node
+	private Map<Node, Integer> goldValues;
 
 
-	private synchronized  void deadEndCombinator(Node n) {
+	private synchronized  void closedNodeSetter(Node n) {
 		
-
 		if (n.equals(escapeState.getCurrentNode()) 
 				|| n.getTile().getGold() != 0
 				|| n.getNeighbours().size() > 2) {
@@ -57,7 +60,16 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		closedNodes.add(n);
 			n.getNeighbours().stream()
 			.filter(nn -> !closedNodes.contains(nn))
-			.forEach(nn -> deadEndCombinator(nn));
+			.forEach(nn -> closedNodeSetter(nn));
+	}
+	
+	private synchronized void weightedGoldValueSetter(Node n) {
+		
+		int neighbouringGoldValue = 0;
+		for (Node neighbour : n.getNeighbours()) {
+			neighbouringGoldValue += neighbour.getTile().getGold() / 2;
+		}
+		goldValues.put(n, n.getTile().getGold() + neighbouringGoldValue);
 	}
 
 	public StackEscapePathFinder(EscapeState state) {
@@ -83,20 +95,35 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 		// Allow ourselves n-seconds to formulate a plan
 		timeout = System.currentTimeMillis() +  MAX_TIME_IN_MS / 1;
+		
+		// Close of all dead end nodes that do not have any gold
 		closedNodes = Collections.synchronizedSet(new HashSet<>());
 		state.getVertices().parallelStream()
 		.filter(dn -> !exit.equals(dn))
 			.filter(dn -> dn.getExits().size() == 1 )
 			.collect(Collectors.toSet())
-			.stream().forEach(dn -> deadEndCombinator(dn));
+			.stream().forEach(dn -> closedNodeSetter(dn));
 
 		System.out.println(String.format("Closed off %d nodes", closedNodes.size()));
 //		closedNodes.stream().forEach(xn -> System.out.println(String.format("Closed r%d:c%d"
 //				, xn.getTile().getRow(),xn.getTile().getColumn())));
 
+		// Get the weighted gold values for all the nodes
+		goldValues = new HashMap<>();
+		state.getVertices().parallelStream()
+			.forEach(n -> weightedGoldValueSetter(n));
+//		goldValues.stream().forEach(p -> System.out.println(String.format("Length: %d, Gold: %d", p.getLength(), p.getGold())));
+//		for(Entry<Node, Integer> s : goldValues.entrySet()) {
+//			System.out.println(String.format("Node : %d has gold = %d, weighted = %d" 
+//					, s.getKey().getId()
+//					, s.getKey().getTile().getGold()
+//					, s.getValue()));
+//		}
 		// Formulate the plan
 		populateStack();
 		buildEscapePaths();
+		
+//		stack.stream().forEach(p -> System.out.println(String.format("Length: %d, Gold: %d", p.getLength(), p.getGold())));
 
 		System.out.println(String.format("%d additional paths found, %d unresolved", numberOfPathsFound, stack.size()));
 		return escapePath;
@@ -198,12 +225,12 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 					continue;
 				}
 				
-				// If all our exits are block then go back until something is
-				// open and stack it
-				EscapePath returnPath = null;
+				// If all our exits are blocked then go back until something is
+				// open and then stack the new path
+				EscapePath returnPath = p;
 				Node endNode = p.getNode();
 				int currentIndex = p.getPath().size() -1;
-				while (p.getPath().containsAll(endNode.getNeighbours())) {
+				while (!pathIsOpen(returnPath)) {
 					if (returnPath == null) {
 						returnPath = (EscapePath) p.clone();
 					}
@@ -212,7 +239,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 					returnPath.addNode(endNode);	
 					returnPath.addLength(returnLength);
 				}
-				if (returnPath != null) {
+				if (returnPath != p) {
 					stackPath(returnPath);
 				}
 				
@@ -290,6 +317,14 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 				return false;
 			}
 			return p.getLength() + shortestPathLength < escapeState.getTimeRemaining();
+		}
+		
+		private boolean pathIsOpen(EscapePath p) {
+
+			return p.getNode().getNeighbours().stream()
+				.filter(n -> !p.getPath().contains(n))
+				.filter(n -> !closedNodes.contains(n))
+				.findFirst().isPresent();
 		}
 
 		/*
@@ -374,7 +409,9 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			Node o2 = e1.getDest();
 
 			// Primary comparison is Gold
-			int returnValue = Integer.compare(o2.getTile().getGold(), o1.getTile().getGold());
+//			int returnValue = Integer.compare(o2.getTile().getGold(), o1.getTile().getGold());
+			// TEMP: Use weighted gold value instead
+			int returnValue = Integer.compare(goldValues.get(o2), goldValues.get(o1));
 
 			if (returnValue == 0) { // Edge length
 				returnValue = Integer.compare(e1.length(), e2.length());
