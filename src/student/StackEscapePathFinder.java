@@ -225,6 +225,8 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 					continue;
 				}
 				
+				// TODO: reinstate path reversal
+				
 				// If all our exits are blocked then go back until something is
 				// open and then stack the new path
 				EscapePath returnPath = p;

@@ -1,6 +1,5 @@
 package student;
 
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -109,6 +108,7 @@ public class EscapePath {
 
 	@Override
 	public boolean equals(Object obj) {
+		
 		if (this == obj) {
 			return true;
 		}
