@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -21,8 +20,10 @@ import game.EscapeState;
 import game.Node;
 
 /**
- * Path finder which uses the shortest path as a base. New paths are created by
- * iterating from the current node.
+ * Multi-threaded Path finder which uses the shortest path as a base. New paths
+ * are created by iterating from the current node and stacked. Each thread pops
+ * the best available incomplete {@code EscapePath} and pursues it until it is
+ * no longer viable.
  */
 public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
@@ -33,44 +34,20 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 	// Wait time for empty stack reads
 	private final int STACK_TIMEOUT_IN_MILLIS = 100;
 
-	// private BlockingDeque<EscapePath> stack;
+	// A use a sorted set to provide a stack
 	private SortedSet<EscapePath> stack;
 
+	// The shortest path is used as the basis for much of the path completion
+	private EscapePath shortestEscapePath;
 	private int shortestPathLength;
-
 	private List<Node> shortestPathCompletion;
 	private int shortTestPathCompletionGold;
 
-	private EscapePath shortestEscapePath;
-	
-	// Nodes we want to ignore
-	private  Set<Node> closedNodes;
-	
+	// Dead-end nodes that we need to ignore
+	private Set<Node> closedNodes;
+
 	// Weighted gold values for each node
 	private Map<Node, Integer> goldValues;
-
-
-	private synchronized  void closedNodeSetter(Node n) {
-		
-		if (n.equals(escapeState.getCurrentNode()) 
-				|| n.getTile().getGold() != 0
-				|| n.getNeighbours().size() > 2) {
-			return;
-		}
-		closedNodes.add(n);
-			n.getNeighbours().stream()
-			.filter(nn -> !closedNodes.contains(nn))
-			.forEach(nn -> closedNodeSetter(nn));
-	}
-	
-	private synchronized void weightedGoldValueSetter(Node n) {
-		
-		int neighbouringGoldValue = 0;
-		for (Node neighbour : n.getNeighbours()) {
-			neighbouringGoldValue += neighbour.getTile().getGold() / 2;
-		}
-		goldValues.put(n, n.getTile().getGold() + neighbouringGoldValue);
-	}
 
 	public StackEscapePathFinder(EscapeState state) {
 
@@ -80,7 +57,6 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 	@Override
 	public EscapePath findEscapePath(EscapeState state) {
 
-       
 		escapeState = state;
 		exit = state.getExit();
 		// Get the shortest route out as a fall back
@@ -94,41 +70,67 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		shortestPathLength = escapePath.getLength();
 
 		// Allow ourselves n-seconds to formulate a plan
-		timeout = System.currentTimeMillis() +  MAX_TIME_IN_MS / 1;
-		
-		// Close of all dead end nodes that do not have any gold
-		closedNodes = Collections.synchronizedSet(new HashSet<>());
-		state.getVertices().parallelStream()
-		.filter(dn -> !exit.equals(dn))
-			.filter(dn -> dn.getExits().size() == 1 )
-			.collect(Collectors.toSet())
-			.stream().forEach(dn -> closedNodeSetter(dn));
+		timeout = System.currentTimeMillis() + MAX_TIME_IN_MS / 1;
 
-		System.out.println(String.format("Closed off %d nodes", closedNodes.size()));
-//		closedNodes.stream().forEach(xn -> System.out.println(String.format("Closed r%d:c%d"
-//				, xn.getTile().getRow(),xn.getTile().getColumn())));
+		// Pre-processing tasks
+		setUpTasks(state);
 
-		// Get the weighted gold values for all the nodes
-		goldValues = new HashMap<>();
-		state.getVertices().parallelStream()
-			.forEach(n -> weightedGoldValueSetter(n));
-//		goldValues.stream().forEach(p -> System.out.println(String.format("Length: %d, Gold: %d", p.getLength(), p.getGold())));
-//		for(Entry<Node, Integer> s : goldValues.entrySet()) {
-//			System.out.println(String.format("Node : %d has gold = %d, weighted = %d" 
-//					, s.getKey().getId()
-//					, s.getKey().getTile().getGold()
-//					, s.getValue()));
-//		}
 		// Formulate the plan
 		populateStack();
 		buildEscapePaths();
-		
-//		stack.stream().forEach(p -> System.out.println(String.format("Length: %d, Gold: %d", p.getLength(), p.getGold())));
 
-		System.out.println(String.format("%d additional paths found, %d unresolved", numberOfPathsFound, stack.size()));
+		System.out.println(String.format("%d additional paths found, %d incomplete", numberOfPathsFound, stack.size()));
 		return escapePath;
 	}
 
+	/*
+	 * Perform some initial analysis of the map
+	 */
+	private void setUpTasks(EscapeState state) {
+
+		// Allow for parallel processing
+		closedNodes = Collections.synchronizedSet(new HashSet<>());
+
+		// Close of all dead end nodes that do not have any gold
+		state.getVertices().parallelStream().filter(dn -> !exit.equals(dn)).filter(dn -> dn.getExits().size() == 1)
+				.collect(Collectors.toSet()).stream().forEach(dn -> closedNodeSetter(dn));
+
+		// Get the weighted gold values for all the nodes
+		goldValues = new HashMap<>();
+		state.getVertices().parallelStream().forEach(n -> weightedGoldValueSetter(n));
+	}
+
+	/*
+	 * The closed node set is initially populated with Nodes that only have one
+	 * exit and no gold. These are expanded into those neighbour nodes with 2
+	 * exits and no gold. This has the effect of closing off dead ends that have
+	 * no gold
+	 */
+	private synchronized void closedNodeSetter(Node n) {
+
+		if (n.equals(escapeState.getCurrentNode()) || n.getTile().getGold() != 0 || n.getNeighbours().size() > 2) {
+			return;
+		}
+		closedNodes.add(n);
+		n.getNeighbours().stream().filter(nn -> !closedNodes.contains(nn)).forEach(nn -> closedNodeSetter(nn));
+	}
+
+	/*
+	 * Include a value for the gold in the neighbouring nodes so we can make
+	 * more informed choices later
+	 */
+	private synchronized void weightedGoldValueSetter(Node n) {
+
+		int neighbouringGoldValue = 0;
+		for (Node neighbour : n.getNeighbours()) {
+			neighbouringGoldValue += neighbour.getTile().getGold() / 2;
+		}
+		goldValues.put(n, n.getTile().getGold() + neighbouringGoldValue);
+	}
+
+	/*
+	 * The initial value on the stack is a path with only the start node
+	 */
 	private void populateStack() {
 
 		stack = Collections.synchronizedSortedSet(new TreeSet<>(new EscapePathOrderComparator()));
@@ -156,6 +158,9 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		return returnPath;
 	}
 
+	/*
+	 * Use all available threads
+	 */
 	private void buildEscapePaths() {
 
 		int maxThreads = Runtime.getRuntime().availableProcessors();
@@ -184,11 +189,8 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		@SuppressWarnings("unused")
 		private static final long serialVersionUID = 8473109576846837452L;
 
-		// Comparator for evaluating exit paths
+		// Comparator for evaluating node selection order
 		private Comparator<Edge> escapePathComparator = (e1, e2) -> escapePathComparator(e1, e2);
-
-		int pathsCreated;
-		int pathsFollowed;
 
 		@Override
 		public Object call() {
@@ -205,8 +207,14 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			return null;
 		}
 
+		/*
+		 * Follow each path while it is viable. When the path splits (at each
+		 * exit path) spawn a new path and push it onto the stack for later
+		 * processing
+		 */
 		private void processPath(EscapePath p) {
 
+			// Used a while loop as recursion ran into stack problems
 			while (p != null) {
 
 				if (System.currentTimeMillis() > timeout) {
@@ -224,27 +232,31 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 					p = getNextPath();
 					continue;
 				}
-				
-				// TODO: reinstate path reversal
-				
+
+				// Check each path to see if reversing it out gives us a new
+				// best solution
+				if (reversePathConditions(p)) {
+					reversePathToExit(p, p.getNode());
+				}
+
 				// If all our exits are blocked then go back until something is
 				// open and then stack the new path
 				EscapePath returnPath = p;
 				Node endNode = p.getNode();
-				int currentIndex = p.getPath().size() -1;
+				int currentIndex = p.getPath().size() - 1;
 				while (!pathIsOpen(returnPath)) {
 					if (returnPath == null) {
 						returnPath = (EscapePath) p.clone();
 					}
 					endNode = p.getPath().get(--currentIndex);
 					int returnLength = returnPath.getNode().getEdge(endNode).length();
-					returnPath.addNode(endNode);	
+					returnPath.addNode(endNode);
 					returnPath.addLength(returnLength);
 				}
 				if (returnPath != p) {
 					stackPath(returnPath);
 				}
-				
+
 				// Order the exits appropriately
 				List<Edge> newExits = new ArrayList<Edge>(p.getNode().getExits());
 				Collections.sort(newExits, escapePathComparator);
@@ -263,7 +275,7 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 							boolean nodeExistsInPath = p.getPath().contains(nextNode);
 
 							// Test rejoining the path and reversing out
-							if (reversePathConditions(p, nodeExistsInPath)) {
+							if (nodeExistsInPath && reversePathConditions(p)) {
 								EscapePath np = createNewEscapePath(p, nextNode, e);
 								// Take away the gold added in creation
 								np.addGold(nextNode.getTile().getGold() * -1);
@@ -303,34 +315,32 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		 */
 		private void stackPath(EscapePath p) {
 
-			pathsCreated++;
 			stack.add(p);
 		}
 
 		/*
 		 * Check to see if we want to escape back down the way we came
 		 */
-		private boolean reversePathConditions(EscapePath p, boolean nodeExistsInPath) {
+		private boolean reversePathConditions(EscapePath p) {
 
-			if (!nodeExistsInPath) {
-				return false;
-			}
 			if (p.getLength() == 0 || p.getGold() + shortTestPathCompletionGold < escapePath.getGold()) {
 				return false;
 			}
 			return p.getLength() + shortestPathLength < escapeState.getTimeRemaining();
 		}
-		
+
+		/*
+		 * Check if all exits are closed, either already in the path or in the
+		 * closed nodes list
+		 */
 		private boolean pathIsOpen(EscapePath p) {
 
-			return p.getNode().getNeighbours().stream()
-				.filter(n -> !p.getPath().contains(n))
-				.filter(n -> !closedNodes.contains(n))
-				.findFirst().isPresent();
+			return p.getNode().getNeighbours().stream().filter(n -> !p.getPath().contains(n))
+					.filter(n -> !closedNodes.contains(n)).findFirst().isPresent();
 		}
 
 		/*
-		 * Check to see if we want to pursue this path
+		 * Check to see if we want to pursue this path using the supplied node
 		 */
 		private boolean continuePathConditions(EscapePath p, Edge e, Node n) {
 
@@ -410,23 +420,15 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 			Node o1 = e1.getDest();
 			Node o2 = e1.getDest();
 
-			// Primary comparison is Gold
-//			int returnValue = Integer.compare(o2.getTile().getGold(), o1.getTile().getGold());
-			// TEMP: Use weighted gold value instead
+			// Primary comparison is weighted gold value
 			int returnValue = Integer.compare(goldValues.get(o2), goldValues.get(o1));
 
 			if (returnValue == 0) { // Edge length
 				returnValue = Integer.compare(e1.length(), e2.length());
 			}
-			int rowDist = o1.getTile().getRow() - exit.getTile().getRow();
-			int colDist = o1.getTile().getColumn() - exit.getTile().getColumn();
-			Double d1 = Math.sqrt((rowDist * rowDist) + (colDist * colDist));
-
-			o2 = e2.getDest();
-			rowDist = o2.getTile().getRow() - exit.getTile().getRow();
-			colDist = o2.getTile().getColumn() - exit.getTile().getColumn();
-			Double d2 = Math.sqrt((rowDist * rowDist) + (colDist * colDist));
-
+			// Compare on distance to exit
+			Double d1 = euclideanDistance(o1, exit);
+			Double d2 = euclideanDistance(o2, exit);
 			if (returnValue == 0) { // Distance from exit
 				returnValue = d1.compareTo(d2);
 			}

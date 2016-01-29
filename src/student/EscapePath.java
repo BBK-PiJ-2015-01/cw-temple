@@ -2,11 +2,12 @@ package student;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 
 import game.Node;
 
 /**
- * An instance of a path that will escape the cavern
+ * An instance of a path from the start {@code Node}. 
  * 
  * @author sbaird02
  *
@@ -37,9 +38,9 @@ public class EscapePath {
 
 	/**
 	 * Creates an path from the supplied path. This is essentially a clone of
-	 * the supplied argument be added manually.
+	 * the supplied argument followed by an addNode({@code Node} node)
 	 * 
-	 * @param node
+	 * @param escapePath
 	 *            an EscapePath to copy
 	 */
 	public EscapePath(EscapePath escapePath) {
@@ -128,6 +129,9 @@ public class EscapePath {
 		if (node == null && other.node != null) {
 			return false;
 		}
-		return node.getId() == other.node.getId();
+		if (!Objects.equals(node, other.node)) {
+			return false;
+		}
+		return Objects.equals(path, other.path);
 	}
 }
