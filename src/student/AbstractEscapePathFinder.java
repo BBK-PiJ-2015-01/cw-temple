@@ -116,7 +116,7 @@ public abstract class AbstractEscapePathFinder implements EscapePathFinder {
 	 */
 	protected boolean isInRange(Node n, int pLength) {
 
-		int rDist = Math.abs(n.getTile().getRow() - exitRow) + (n.getTile().getColumn() - exitCol);
+		int rDist = Math.abs(n.getTile().getRow() - exitRow) + Math.abs((n.getTile().getColumn() - exitCol));
 		rDist *= avgLength;
 		return rDist + pLength < escapeState.getTimeRemaining();
 	}
