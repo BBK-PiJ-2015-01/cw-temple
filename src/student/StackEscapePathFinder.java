@@ -33,6 +33,8 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 
 	// Wait time for empty stack reads
 	private final int STACK_TIMEOUT_IN_MILLIS = 100;
+	// Maximum number of stack misses before abandoning thread
+	private final int MAX_STACK_MISSES = 3;
 
 	// A use a sorted set to provide a stack
 	private SortedSet<EscapePath> stack;
@@ -357,9 +359,9 @@ public class StackEscapePathFinder extends AbstractEscapePathFinder {
 		private EscapePath getNextPath() {
 
 			EscapePath returnPath = removeFromStack();
-
+			int retries = 0;
 			// Try sleeping and looping until timeout
-			while (returnPath == null && System.currentTimeMillis() < timeout) {
+			while (MAX_STACK_MISSES > retries++ && returnPath == null && System.currentTimeMillis() < timeout) {
 				try {
 					Thread.sleep(STACK_TIMEOUT_IN_MILLIS);
 					returnPath = removeFromStack();
